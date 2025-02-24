@@ -1,0 +1,96 @@
+name: build-gwine
+
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+env:
+  WINE_VERSION: '10.2'
+  REVISION: '1'  # Ajout d'une variable pour la révision, ajuste-la si nécessaire
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base  # Utilise une image Arch Linux comme environnement
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          # Met à jour le système et installe les dépendances de base
+          printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
+          sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
+          pacman-key --init && pacman-key --populate
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git curl tar  # Outils nécessaires pour le build
+          pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+          pacman-key --lsign-key 3056513887B78AEB
+          pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm
+          echo '[chaotic-aur]' >> /etc/pacman.conf
+          echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
+          pacman -Syu --noconfirm
+          mkdir -p /home/runner/.config/frogminer/
+
+      - name: Create build user and setup AUR
+        run: |
+          # Ajoute un utilisateur 'build' pour compiler les paquets AUR
+          useradd -m --shell=/bin/bash build
+          usermod -L build  # Verrouille le mot de passe (pas de login)
+          echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          echo "root ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+          # Passe à l'utilisateur 'build' et configure Paru
+          su - build -c "git clone https://aur.archlinux.org/paru-bin.git --single-branch"
+          su - build -c "cd paru-bin && makepkg -si --noconfirm"
+          su - build -c "rm -rf paru-bin"
+          su - build -c "paru -S ntsync-header --noconfirm"
+
+
+      - name: Clone wine-tkg-git repo and set the gwine recipe
+        working-directory: /home/runner/work/
+        run: |
+          git clone https://github.com/Frogging-Family/wine-tkg-git.git
+          cd wine-tkg-git/wine-tkg-git
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
+          sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
+          sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
+          sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
+          sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
+          sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
+          sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
+          cd wine-tkg-profiles
+          sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
+          sed -i 's/_fsync_spincounts="true"/_fsync_spincounts="false"/g' advanced-customization.cfg
+          sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
+          sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' advanced-customization.cfg
+
+          # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
+          cd /home/runner/work/
+          cp /home/runner/work/gwine/gwine/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
+
+      - name: Start build
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
+        run: |
+          yes | ./non-makepkg-build.sh
+
+      - name: Package
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
+        run: |
+          mv wine-tkg-* gwine-$WINE_VERSION-$REVISION-x86_64
+          ln -s ./wine gwine-$WINE_VERSION-$REVISION-x86_64/bin/wine64
+          tar cJvf gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz gwine-$WINE_VERSION-$REVISION-x86_64
+          mv gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz /tmp/gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz
+
+      - name: Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          draft: false
+          prerelease: false
+          automatic_release_tag: "gwine-${{ env.WINE_VERSION }}-${{ env.REVISION }}"
+          title: "Gwine ${{ env.WINE_VERSION }}-${{ env.REVISION }}"
+          files: "/tmp/gwine-${{ env.WINE_VERSION }}-${{ env.REVISION }}-x86_64.tar.xz"
