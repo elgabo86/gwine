@@ -82,9 +82,6 @@ jobs:
           # Renomme le répertoire avec "gwine-" suivi de la version extraite
           mv "$BUILD_DIR" "gwine-$VERSION"
 
-          # Crée un lien symbolique pour wine64
-          ln -s ./wine "gwine-$VERSION/bin/wine64"
-
           # Crée l'archive avec le nom basé sur la version extraite
           tar cJvf "gwine-$VERSION.tar.xz" "gwine-$VERSION"
 
