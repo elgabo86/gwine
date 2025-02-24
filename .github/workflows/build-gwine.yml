@@ -55,7 +55,7 @@ jobs:
 
           # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
           git clone https://github.com/elgabo86/gwine gwinetemp
-          cp /home/runner/work/gwinetemp/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
+          cp gwinetemp/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
 
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
