@@ -9,10 +9,6 @@ on:
       - 'main'
   workflow_dispatch:
 
-env:
-  WINE_VERSION: '10.2'
-  REVISION: '1'  # Ajout d'une variable pour la révision, ajuste-la si nécessaire
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -67,19 +63,36 @@ jobs:
           sed -i 's/_fsync_spincounts="true"/_fsync_spincounts="false"/g' advanced-customization.cfg
           sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
           sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' advanced-customization.cfg
+          sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           yes | ./non-makepkg-build.sh
 
-      - name: Package
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
-        run: |
-          mv wine-tkg-* gwine-$WINE_VERSION-$REVISION-x86_64
-          ln -s ./wine gwine-$WINE_VERSION-$REVISION-x86_64/bin/wine64
-          tar cJvf gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz gwine-$WINE_VERSION-$REVISION-x86_64
-          mv gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz /tmp/gwine-$WINE_VERSION-$REVISION-x86_64.tar.xz
+     - name: Package
+       working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
+       run: |
+          # Trouve le répertoire généré par wine-tkg-git (par exemple, wine-tkg-git-10.2.r1.gec5fbb99)
+          BUILD_DIR=$(ls -d wine-tkg-git-* | head -n 1)
+
+          # Extrait la partie de la version en supprimant "wine-tkg-git-" du début et le commit de fin
+          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg-git-\(.*\)\.g[0-9a-f]*$/\1/')
+
+          # Renomme le répertoire avec "gwine-" suivi de la version extraite
+          mv "$BUILD_DIR" "gwine-$VERSION"
+
+          # Crée un lien symbolique pour wine64
+          ln -s ./wine "gwine-$VERSION/bin/wine64"
+
+          # Crée l'archive avec le nom basé sur la version extraite
+          tar cJvf "gwine-$VERSION.tar.xz" "gwine-$VERSION"
+
+          # Déplace l'archive vers /tmp pour l'étape de release
+          mv "gwine-$VERSION.tar.xz" "/tmp/gwine-$VERSION.tar.xz"
+
+          # Stocke la version dans une variable d'environnement pour l'étape suivante
+          echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Release
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -87,6 +100,6 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           draft: false
           prerelease: false
-          automatic_release_tag: "gwine-${{ env.WINE_VERSION }}-${{ env.REVISION }}"
-          title: "Gwine ${{ env.WINE_VERSION }}-${{ env.REVISION }}"
-          files: "/tmp/gwine-${{ env.WINE_VERSION }}-${{ env.REVISION }}-x86_64.tar.xz"
+          automatic_release_tag: "gwine-${{ env.EXTRACTED_VERSION }}"
+          title: "Gwine ${{ env.EXTRACTED_VERSION }}"
+          files: "/tmp/gwine-${{ env.EXTRACTED_VERSION }}.tar.xz"
