@@ -17,8 +17,6 @@ jobs:
       image: archlinux:base  # Utilise une image Arch Linux comme environnement
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Setup environment
         run: |
           # Met à jour le système et installe les dépendances de base
@@ -55,10 +53,9 @@ jobs:
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
 
-          ls -la /home/runner/work/*/*/
-
           # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
-          cp /home/runner/work/gwine/gwine/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
+          git clone https://github.com/elgabo86/gwine
+          cp /home/runner/work/gwine/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
 
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
