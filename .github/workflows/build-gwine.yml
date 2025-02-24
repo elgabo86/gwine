@@ -53,10 +53,13 @@ jobs:
       - name: Clone wine-tkg-git repo and set the gwine recipe
         working-directory: /home/runner/work/
         run: |
+          git clone https://github.com/Frogging-Family/wine-tkg-git.git
+
+          ls -la /home/runner/work/*/*/
+
           # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
           cp /home/runner/work/gwine/gwine/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
 
-          git clone https://github.com/Frogging-Family/wine-tkg-git.git
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
           sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
@@ -70,10 +73,6 @@ jobs:
           sed -i 's/_fsync_spincounts="true"/_fsync_spincounts="false"/g' advanced-customization.cfg
           sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
           sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' advanced-customization.cfg
-
-          # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
-          cd /home/runner/work/
-          cp /home/runner/work/gwine/gwine/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
