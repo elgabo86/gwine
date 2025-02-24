@@ -70,9 +70,9 @@ jobs:
         run: |
           yes | ./non-makepkg-build.sh
 
-     - name: Package
-       working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
-       run: |
+      - name: Package
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
+        run: |
           # Trouve le répertoire généré par wine-tkg-git (par exemple, wine-tkg-git-10.2.r1.gec5fbb99)
           BUILD_DIR=$(ls -d wine-tkg-git-* | head -n 1)
 
