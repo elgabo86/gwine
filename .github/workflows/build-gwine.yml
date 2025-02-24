@@ -1,5 +1,8 @@
 name: build-gwine
 
+permissions:
+  contents: write  # Autorise l'écriture sur le contenu (code, tags, releases)
+
 on:
   push:
     branches:
