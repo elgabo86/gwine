@@ -1,11 +1,11 @@
 name: build-gwine
 
 permissions:
-  contents: write  # Autorise l'écriture sur le contenu (code, tags, releases)
+  contents: write
 
 on:
   schedule:
-    - cron: "00 06 * * *" # build at 07:00 UTC every day
+    - cron: "00 06 * * *"
   push:
     branches:
       - 'main'
@@ -15,43 +15,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: archlinux:base  # Utilise une image Arch Linux comme environnement
+      image: archlinux:base
 
     steps:
       - name: Setup environment
         run: |
-          # Met à jour le système et installe les dépendances de base
           printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
           sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
           pacman-key --init && pacman-key --populate
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git curl tar  # Outils nécessaires pour le build
+          pacman -S --noconfirm base-devel git curl tar
           mkdir -p /home/runner/.config/frogminer/
-
-      - name: Create build user and setup AUR
-        run: |
-          # Ajoute un utilisateur 'build' pour compiler les paquets AUR
-          useradd -m --shell=/bin/bash build
-          usermod -L build  # Verrouille le mot de passe (pas de login)
-          echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-          echo "root ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-          # Passe à l'utilisateur 'build' et configure Paru
-          su - build -c "git clone https://aur.archlinux.org/paru-bin.git --single-branch"
-          su - build -c "cd paru-bin && makepkg -si --noconfirm"
-          su - build -c "rm -rf paru-bin"
-          su - build -c "paru -S ntsync-header --noconfirm"
-
 
       - name: Clone wine-tkg-git repo and set the gwine recipe
         working-directory: /home/runner/work/
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
-
-          # Copie fixsdl.mypatch depuis la racine du dépôt 'gwine'
           git clone https://github.com/elgabo86/gwine gwinetemp
           cp gwinetemp/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
-
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
           sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
@@ -75,22 +56,11 @@ jobs:
       - name: Package
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
-          # Trouve le répertoire généré par wine-tkg-git (par exemple, wine-tkg-git-10.2.r1.gec5fbb99)
           BUILD_DIR=$(ls -d wine-tkg-git-* | head -n 1)
-
-          # Extrait la partie de la version en supprimant "wine-tkg-git-" du début et le commit de fin
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg-git-\(.*\)\.g[0-9a-f]*$/\1/')
-
-          # Renomme le répertoire avec "gwine-" suivi de la version extraite
           mv "$BUILD_DIR" "gwine-$VERSION"
-
-          # Crée l'archive avec le nom basé sur la version extraite
           tar cJvf "gwine-$VERSION.tar.xz" "gwine-$VERSION"
-
-          # Déplace l'archive vers /tmp pour l'étape de release
           mv "gwine-$VERSION.tar.xz" "/tmp/gwine-$VERSION.tar.xz"
-
-          # Stocke la version dans une variable d'environnement pour l'étape suivante
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Release
