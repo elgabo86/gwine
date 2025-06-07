@@ -51,6 +51,7 @@ jobs:
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
+          export PACMAN_OPTS="--noconfirm"
           yes | ./non-makepkg-build.sh
 
       - name: Package
