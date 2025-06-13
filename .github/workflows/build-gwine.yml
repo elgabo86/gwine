@@ -39,6 +39,7 @@ jobs:
           sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
           sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
           sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
+          cd wine-tkg-profiles
           sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
           sed -i 's/_fsync_spincounts="true"/_fsync_spincounts="false"/g' advanced-customization.cfg
           sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
