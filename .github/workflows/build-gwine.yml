@@ -31,19 +31,17 @@ jobs:
         working-directory: /home/runner/work/
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
-          git clone https://github.com/elgabo86/gwine gwinetemp
-          cp gwinetemp/fixsdl.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
           sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
           sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
           sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
+          sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
           sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
+          sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
           cd wine-tkg-profiles
           sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
-          sed -i 's/_fsync_spincounts="true"/_fsync_spincounts="false"/g' advanced-customization.cfg
           sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
-          sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' advanced-customization.cfg
           sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
 
       - name: Start build
