@@ -24,7 +24,7 @@ jobs:
           sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
           pacman-key --init && pacman-key --populate
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git curl tar jack2 linux-headers
+          pacman -S --noconfirm base-devel git curl tar jack2 clang
           mkdir -p /home/runner/.config/frogminer/
 
       - name: Clone wine-tkg-git repo and set the gwine recipe
