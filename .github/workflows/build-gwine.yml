@@ -37,6 +37,7 @@ jobs:
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
           sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
           sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
+          sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
           sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
           sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
           sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
