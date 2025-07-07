@@ -94,7 +94,7 @@ jobs:
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           git clone https://github.com/elgabo86/gwine gwinetemp
           cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp"/g' customization.cfg
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve"/g' customization.cfg
           cd wine-tkg-profiles
           sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
           sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
