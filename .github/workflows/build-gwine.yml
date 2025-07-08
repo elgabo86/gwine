@@ -94,10 +94,7 @@ jobs:
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           git clone https://github.com/elgabo86/gwine gwinetemp
           cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve"/g' customization.cfg
-          cd wine-tkg-profiles
-          sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
-          sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp"/g' customization.cfg
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
@@ -107,8 +104,8 @@ jobs:
       - name: Package
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
-          BUILD_DIR=$(ls -d wine-tkg-git* | head -n 1)
-          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg-git-\(.*\)\.g[0-9a-f]*$/\1/')
+          BUILD_DIR=$(ls -d wine-tkg* | head -n 1)
+          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "gwine-proton-$VERSION"
           tar cJvf "gwine-proton-$VERSION.tar.xz" "gwine-proton-$VERSION"
           mv "gwine-proton-$VERSION.tar.xz" "/tmp/gwine-proton-$VERSION.tar.xz"
