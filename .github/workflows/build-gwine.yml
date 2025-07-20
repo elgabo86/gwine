@@ -4,8 +4,6 @@ permissions:
   contents: write
 
 on:
-  schedule:
-    - cron: "00 06 * * *"
   push:
     branches:
       - 'main'
