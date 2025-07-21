@@ -90,6 +90,7 @@ jobs:
           git clone https://github.com/elgabo86/gwine gwinetemp
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
+          sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
