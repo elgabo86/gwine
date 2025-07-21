@@ -89,7 +89,7 @@ jobs:
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           git clone https://github.com/elgabo86/gwine gwinetemp
           cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp"/g' customization.cfg
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
