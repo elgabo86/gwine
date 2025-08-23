@@ -162,5 +162,5 @@ jobs:
           draft: false
           prerelease: false
           automatic_release_tag: "gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}"
-          title: "Gwine Proton ${{ env.EXTRACTED_VERSION }}"
+          title: "Gwine Proton Wow64 ${{ env.EXTRACTED_VERSION }}"
           files: "/tmp/gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}.tar.xz"
