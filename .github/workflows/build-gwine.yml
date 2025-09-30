@@ -38,6 +38,7 @@ jobs:
           cd wine-tkg-profiles
           sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
           sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
+          sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
