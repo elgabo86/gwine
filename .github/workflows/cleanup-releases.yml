@@ -41,9 +41,9 @@ jobs:
               }
             });
 
-            // Trier chaque variante par date de création (plus récent en premier)
+            // Trier chaque variante par date de publication (plus récent en premier)
             for (const variant of Object.keys(variants)) {
-              variants[variant].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              variants[variant].sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
 
               // Supprimer les releases plus anciennes que les 3 dernières
               const releasesToDelete = variants[variant].slice(3);
