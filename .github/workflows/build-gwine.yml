@@ -7,10 +7,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-gwine:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     container:
       image: archlinux:base
+    strategy:
+      matrix:
+        variant:
+          - name: gwine
+            preset: none
+            title: Gwine
+            package_pattern: wine-tkg-git-*.g*
+            setup_commands: |
+              sed -i 's/_use_ntsync="false"/_use_ntsync="inproc"/g' customization.cfg
+              sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
+              sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
+              sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
+              sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
+              sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
+              sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
+              sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
+
+          - name: gwine-proton
+            preset: valve-exp-bleeding
+            title: "Gwine Proton"
+            package_pattern: wine-tkg*
+            setup_commands: ""
+
+          - name: gwine-proton-wow64
+            preset: valve-exp-bleeding
+            title: "Gwine Proton Wow64"
+            package_pattern: wine-tkg*
+            setup_commands: |
+              sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
       - name: Setup environment
@@ -22,23 +54,13 @@ jobs:
           pacman -S --noconfirm base-devel git curl tar jack2
           mkdir -p /home/runner/.config/frogminer/
 
-      - name: Clone wine-tkg-git repo and set the gwine recipe
+      - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="none"/g' customization.cfg
-          sed -i 's/_use_ntsync="false"/_use_ntsync="inproc"/g' customization.cfg
-          sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
-          sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
-          sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
-          sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
-          sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
-          sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
-          cd wine-tkg-profiles
-          sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' advanced-customization.cfg
-          sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' advanced-customization.cfg
-          sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' advanced-customization.cfg
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="${{ matrix.variant.preset }}"/g' customization.cfg
+          ${{ matrix.variant.setup_commands }}
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
@@ -48,131 +70,23 @@ jobs:
       - name: Package
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
-          BUILD_DIR=$(ls -d wine-tkg-git-* | head -n 1)
-          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg-git-\(.*\)\.g[0-9a-f]*$/\1/')
-          mv "$BUILD_DIR" "gwine-$VERSION"
-          tar cJvf "gwine-$VERSION.tar.xz" "gwine-$VERSION"
-          mv "gwine-$VERSION.tar.xz" "/tmp/gwine-$VERSION.tar.xz"
-          echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Release
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          draft: false
-          prerelease: false
-          automatic_release_tag: "gwine-${{ env.EXTRACTED_VERSION }}"
-          title: "Gwine ${{ env.EXTRACTED_VERSION }}"
-          files: "/tmp/gwine-${{ env.EXTRACTED_VERSION }}.tar.xz"
-
-      - name: Cleanup old releases
-        uses: "benc-uk/workflow-dispatch@v1"
-        with:
-          workflow: cleanup-releases
-          token: "${{ secrets.GITHUB_TOKEN }}"
-
-  build-gwine-proton:
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:base
-
-    steps:
-      - name: Setup environment
-        run: |
-          printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
-          sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
-          pacman-key --init && pacman-key --populate
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git curl tar jack2
-          mkdir -p /home/runner/.config/frogminer/
-
-      - name: Clone wine-tkg-git repo and set the gwine-proton recipe
-        working-directory: /home/runner/work/
-        run: |
-          git clone https://github.com/Frogging-Family/wine-tkg-git.git
-          git clone https://github.com/elgabo86/gwine gwinetemp
-          cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
-
-      - name: Start build
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
-        run: |
-          yes | ./non-makepkg-build.sh
-
-      - name: Package
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
-        run: |
-          BUILD_DIR=$(ls -d wine-tkg* | head -n 1)
+          BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
-          mv "$BUILD_DIR" "gwine-proton-$VERSION"
-          tar cJvf "gwine-proton-$VERSION.tar.xz" "gwine-proton-$VERSION"
-          mv "gwine-proton-$VERSION.tar.xz" "/tmp/gwine-proton-$VERSION.tar.xz"
+          mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
+          tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
+          mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Release
-        uses: "marvinpinto/action-automatic-releases@latest"
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          tag_name: "${{ matrix.variant.name }}-${{ env.EXTRACTED_VERSION }}"
+          name: "${{ matrix.variant.title }} ${{ env.EXTRACTED_VERSION }}"
+          files: "/tmp/${{ matrix.variant.name }}-${{ env.EXTRACTED_VERSION }}.tar.xz"
           draft: false
           prerelease: false
-          automatic_release_tag: "gwine-proton-${{ env.EXTRACTED_VERSION }}"
-          title: "Gwine Proton ${{ env.EXTRACTED_VERSION }}"
-          files: "/tmp/gwine-proton-${{ env.EXTRACTED_VERSION }}.tar.xz"
-
-      - name: Cleanup old releases
-        uses: "benc-uk/workflow-dispatch@v1"
-        with:
-          workflow: cleanup-releases
-          token: "${{ secrets.GITHUB_TOKEN }}"
-
-  build-gwine-proton-wow64:
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:base
-
-    steps:
-      - name: Setup environment
-        run: |
-          printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
-          sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
-          pacman-key --init && pacman-key --populate
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git curl tar jack2
-          mkdir -p /home/runner/.config/frogminer/
-
-      - name: Clone wine-tkg-git repo and set the gwine-proton-wow64 recipe
-        working-directory: /home/runner/work/
-        run: |
-          git clone https://github.com/Frogging-Family/wine-tkg-git.git
-          git clone https://github.com/elgabo86/gwine gwinetemp
-          cd wine-tkg-git/wine-tkg-git
-          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
-          sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
-
-      - name: Start build
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
-        run: |
-          yes | ./non-makepkg-build.sh
-
-      - name: Package
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
-        run: |
-          BUILD_DIR=$(ls -d wine-tkg* | head -n 1)
-          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
-          mv "$BUILD_DIR" "gwine-proton-wow64-$VERSION"
-          tar cJvf "gwine-proton-wow64-$VERSION.tar.xz" "gwine-proton-wow64-$VERSION"
-          mv "gwine-proton-wow64-$VERSION.tar.xz" "/tmp/gwine-proton-wow64-$VERSION.tar.xz"
-          echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Release
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          draft: false
-          prerelease: false
-          automatic_release_tag: "gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}"
-          title: "Gwine Proton Wow64 ${{ env.EXTRACTED_VERSION }}"
-          files: "/tmp/gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}.tar.xz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old releases
         uses: "benc-uk/workflow-dispatch@v1"
