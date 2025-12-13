@@ -65,6 +65,12 @@ jobs:
           title: "Gwine ${{ env.EXTRACTED_VERSION }}"
           files: "/tmp/gwine-${{ env.EXTRACTED_VERSION }}.tar.xz"
 
+      - name: Cleanup old releases
+        uses: "benc-uk/workflow-dispatch@v1"
+        with:
+          workflow: cleanup-releases
+          token: "${{ secrets.GITHUB_TOKEN }}"
+
   build-gwine-proton:
     runs-on: ubuntu-latest
     container:
@@ -112,6 +118,12 @@ jobs:
           automatic_release_tag: "gwine-proton-${{ env.EXTRACTED_VERSION }}"
           title: "Gwine Proton ${{ env.EXTRACTED_VERSION }}"
           files: "/tmp/gwine-proton-${{ env.EXTRACTED_VERSION }}.tar.xz"
+
+      - name: Cleanup old releases
+        uses: "benc-uk/workflow-dispatch@v1"
+        with:
+          workflow: cleanup-releases
+          token: "${{ secrets.GITHUB_TOKEN }}"
 
   build-gwine-proton-wow64:
     runs-on: ubuntu-latest
@@ -161,3 +173,9 @@ jobs:
           automatic_release_tag: "gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}"
           title: "Gwine Proton Wow64 ${{ env.EXTRACTED_VERSION }}"
           files: "/tmp/gwine-proton-wow64-${{ env.EXTRACTED_VERSION }}.tar.xz"
+
+      - name: Cleanup old releases
+        uses: "benc-uk/workflow-dispatch@v1"
+        with:
+          workflow: cleanup-releases
+          token: "${{ secrets.GITHUB_TOKEN }}"
