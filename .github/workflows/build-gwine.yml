@@ -8,15 +8,18 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.variant.display_name }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     continue-on-error: true
     container:
       image: archlinux:base
     strategy:
+      fail-fast: false
       matrix:
         variant:
           - name: gwine
+            display_name: "Build gwine"
             preset: none
             title: Gwine
             package_pattern: wine-tkg-git-*.g*
@@ -33,12 +36,14 @@ jobs:
               sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
 
           - name: gwine-proton
+            display_name: "Build gwine-proton"
             preset: valve-exp-bleeding
             title: "Gwine Proton"
             package_pattern: wine-tkg*
             setup_commands: ""
 
           - name: gwine-proton-wow64
+            display_name: "Build gwine-proton-wow64"
             preset: valve-exp-bleeding
             title: "Gwine Proton Wow64"
             package_pattern: wine-tkg*
@@ -89,8 +94,58 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Cleanup old releases
-        uses: "benc-uk/workflow-dispatch@v1"
+        uses: actions/github-script@v7
         with:
-          workflow: cleanup-releases
-          token: "${{ secrets.GITHUB_TOKEN }}"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const variants = {
+              'gwine': [],
+              'gwine-proton': [],
+              'gwine-proton-wow64': []
+            };
+
+            releases.forEach(release => {
+              if (release.tag_name.startsWith('gwine-proton-wow64-')) {
+                variants['gwine-proton-wow64'].push(release);
+              } else if (release.tag_name.startsWith('gwine-proton-')) {
+                variants['gwine-proton'].push(release);
+              } else if (release.tag_name.startsWith('gwine-')) {
+                variants['gwine'].push(release);
+              }
+            });
+
+            for (const variant of Object.keys(variants)) {
+              variants[variant].sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+              const releasesToDelete = variants[variant].slice(3);
+
+              for (const release of releasesToDelete) {
+                console.log(`Deleting ${release.tag_name} (${release.name})`);
+
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id
+                });
+
+                try {
+                  await github.rest.git.deleteRef({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: `tags/${release.tag_name}`
+                  });
+                  console.log(`Tag ${release.tag_name} deleted`);
+                } catch (error) {
+                  console.log(`Cannot delete tag ${release.tag_name}: ${error.message}`);
+                }
+              }
+            }
