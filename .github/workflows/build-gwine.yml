@@ -41,7 +41,7 @@ jobs:
             title: "Gwine Proton"
             package_pattern: wine-tkg*
             setup_commands: |
-              cp -r ${GITHUB_WORKSPACE}/gwine-workspace/patches/* ./wine-tkg-userpatches/
+              cp -r /home/runner/work/gwine-workspace/patches/* /home/runner/work/wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
 
           - name: gwine-proton-wow64
             display_name: "Build gwine-proton-wow64"
@@ -49,7 +49,7 @@ jobs:
             title: "Gwine Proton Wow64"
             package_pattern: wine-tkg*
             setup_commands: |
-              cp -r ${GITHUB_WORKSPACE}/gwine-workspace/patches/* ./wine-tkg-userpatches/
+              cp -r /home/runner/work/gwine-workspace/patches/* /home/runner/work/wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
               sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
