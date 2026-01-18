@@ -40,8 +40,7 @@ jobs:
             preset: valve-exp-bleeding
             title: "Gwine Proton"
             package_pattern: wine-tkg*
-            setup_commands: |
-              cp -r /home/runner/work/gwine-workspace/patches/* /home/runner/work/wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
+            setup_commands: ""
 
           - name: gwine-proton-wow64
             display_name: "Build gwine-proton-wow64"
@@ -49,7 +48,6 @@ jobs:
             title: "Gwine Proton Wow64"
             package_pattern: wine-tkg*
             setup_commands: |
-              cp -r /home/runner/work/gwine-workspace/patches/* /home/runner/work/wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
               sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
@@ -61,11 +59,6 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm base-devel git curl tar jack2
           mkdir -p /home/runner/.config/frogminer/
-
-      - name: Checkout gwine patches
-        uses: actions/checkout@v4
-        with:
-          path: gwine-workspace
 
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
