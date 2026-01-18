@@ -1,9 +1,0 @@
---- a/dlls/winedmo/unix_private.h
-+++ b/dlls/winedmo/unix_private.h
-@@ -46,7 +46,6 @@ extern int mediaconv_demuxer_open( AVFormatContext **ctx, struct stream_context
- /* libavcodec/pcm_byte_order_reverse.c */
- #ifdef HAVE_FFMPEG
--extern const AVBitStreamFilter ff_pcm_byte_order_reverse_bsf;
- #endif
-
- /* unixlib.c */

@@ -1,0 +1,16 @@
+--- a/wine-tkg-patches/hotfixes/valve/hotfixes
++++ b/wine-tkg-patches/hotfixes/valve/hotfixes
+@@ -54,9 +54,10 @@ if [[ "$_plain_version" = *_10.0 ]]; then
+   fi
+
+   # Bleeding edge atiadlxx ADL2 changes are failing to build against current sniper container (and Archlinux alike), let's revert
+-  if [[ "$_LOCAL_PRESET" = valve-exp-bleeding ]]; then
+-    cp "$_where"/wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2.myrevert "$_where"/
+-  fi
++  # DISABLED: Patch no longer applies cleanly to current Wine version
++  # if [[ "$_LOCAL_PRESET" = valve-exp-bleeding ]]; then
++  #   cp "$_where"/wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2.myrevert "$_where"/
++  # fi
+
+   # Revert breaking change regarding linking against libopencl - https://github.com/ValveSoftware/wine/commit/f946d7c633088e7ee41da62dcbcb5a7480804d65
+   # https://github.com/Frogging-Family/wine-tkg-git/issues/1467
