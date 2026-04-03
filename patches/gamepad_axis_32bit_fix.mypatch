@@ -1,0 +1,13 @@
+--- a/dlls/winebus.sys/hid.c
++++ b/dlls/winebus.sys/hid.c
+@@ -256,9 +256,7 @@ BOOL hid_device_add_hatswitch(struct unix_device *iface, INT count)
+ 
+ static BYTE hid_device_determine_axis_size(LONG min, LONG max)
+ {
+-    if ((min >= 0 && max <= 255) || (min >= -128 && max <= 127)) return 8;
+-    if ((min >= 0 && max <= 65535) || (min >= -32768 && max <= 32767)) return 16;
+-    return 32;
++    return 32; /* Force 32-bit for compatibility with older DirectInput games */
+ }
+ 
+ static BOOL hid_device_add_axis_count(struct unix_device *iface, BOOL rel, BYTE size, BYTE count,
