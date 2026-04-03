@@ -24,16 +24,23 @@ jobs:
             title: Gwine
             package_pattern: wine-tkg-git-*.g*
             setup_commands: |
-              sed -i 's/_use_ntsync="false"/_use_ntsync="inproc"/g' customization.cfg
+              # Sync with local customization.cfg settings
+              sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
               sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
               sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
               sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
+              sed -i 's/_FS_bypass_compositor="false"/_FS_bypass_compositor="true"/g' customization.cfg
               sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
+              sed -i 's/_proton_mf_patches="false"/_proton_mf_patches="true"/g' customization.cfg
+              sed -i 's/_msvcrt_nativebuiltin="false"/_msvcrt_nativebuiltin="true"/g' customization.cfg
               sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
               sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
+              # Sync with local advanced-customization.cfg settings
+              sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' wine-tkg-profiles/advanced-customization.cfg
 
           - name: gwine-proton
             display_name: "Build gwine-proton"
@@ -67,6 +74,15 @@ jobs:
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="${{ matrix.variant.preset }}"/g' customization.cfg
           ${{ matrix.variant.setup_commands }}
+
+      - name: Copy custom patches
+        working-directory: /home/runner/work/
+        run: |
+          # Copy all .mypatch files from patches directory
+          if [ -d "$GITHUB_WORKSPACE/patches" ]; then
+            cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
+            echo "Copied custom patches from patches directory"
+          fi
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
