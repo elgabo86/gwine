@@ -58,6 +58,9 @@ jobs:
               sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup environment
         run: |
           printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
