@@ -81,9 +81,15 @@ jobs:
       - name: Copy custom patches
         working-directory: /home/runner/work/
         run: |
-          # Copy all .mypatch files from patches directory
+          # Copy .mypatch files from patches directory
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
+            # Copy patches applicable to all variants
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
+            # Remove gwine-specific patches from proton builds
+            if [[ "${{ matrix.variant.name }}" == gwine-proton* ]]; then
+              rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
+              echo "Removed gwine-specific patches for proton build"
+            fi
             echo "Copied custom patches from patches directory"
           fi
 
