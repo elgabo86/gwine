@@ -49,6 +49,8 @@ jobs:
             package_pattern: wine-tkg*
             setup_commands: |
               sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
       - name: Checkout repository
