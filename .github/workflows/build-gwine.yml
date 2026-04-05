@@ -94,6 +94,7 @@ jobs:
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           echo '_ci_build="true"' >> customization.cfg
+          echo '_nomakepkg_dependency_autoresolver="false"' >> customization.cfg
           yes | ./non-makepkg-build.sh
 
       - name: Package
