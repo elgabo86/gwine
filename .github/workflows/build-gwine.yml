@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 360
     continue-on-error: true
     container:
-      image: archlinux:base
+      image: fedora:latest
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +36,7 @@ jobs:
               sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
               sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
               # Sync with local advanced-customization.cfg settings
-              # sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
@@ -47,13 +47,6 @@ jobs:
             preset: valve-exp-bleeding
             title: "Gwine Proton"
             package_pattern: wine-tkg*
-            setup_commands: ""
-
-          - name: gwine-proton-wow64
-            display_name: "Build gwine-proton-wow64"
-            preset: valve-exp-bleeding
-            title: "Gwine Proton Wow64"
-            package_pattern: wine-tkg*
             setup_commands: |
               sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
 
@@ -63,12 +56,8 @@ jobs:
 
       - name: Setup environment
         run: |
-          printf "[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" | tee -a /etc/pacman.conf
-          sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$(nproc)"/g' /etc/makepkg.conf
-          pacman-key --init && pacman-key --populate
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git curl tar jack2
-          mkdir -p /home/runner/.config/frogminer/
+          dnf -y update
+          dnf -y install git curl tar jack-audio-connection-kit-devel @development-tools
 
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
@@ -132,14 +121,11 @@ jobs:
 
             const variants = {
               'gwine': [],
-              'gwine-proton': [],
-              'gwine-proton-wow64': []
+              'gwine-proton': []
             };
 
             releases.forEach(release => {
-              if (release.tag_name.startsWith('gwine-proton-wow64-')) {
-                variants['gwine-proton-wow64'].push(release);
-              } else if (release.tag_name.startsWith('gwine-proton-')) {
+              if (release.tag_name.startsWith('gwine-proton-')) {
                 variants['gwine-proton'].push(release);
               } else if (release.tag_name.startsWith('gwine-')) {
                 variants['gwine'].push(release);
