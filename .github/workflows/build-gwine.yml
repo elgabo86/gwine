@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 360
     continue-on-error: true
     container:
-      image: fedora:latest
+      image: artixlinux/artixlinux:latest
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +36,9 @@ jobs:
               sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
               sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
               # Sync with local advanced-customization.cfg settings
-              sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/g' wine-tkg-profiles/advanced-customization.cfg
+              # Using non-wow64 mode (lib32) for full 32-bit support
+              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
@@ -48,7 +50,9 @@ jobs:
             title: "Gwine Proton"
             package_pattern: wine-tkg*
             setup_commands: |
-              sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/' wine-tkg-profiles/advanced-customization.cfg
+              # Using non-wow64 mode (lib32) for full 32-bit support
+              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
 
@@ -58,8 +62,26 @@ jobs:
 
       - name: Setup environment
         run: |
-          dnf -y update
-          dnf -y install git curl tar jack-audio-connection-kit-devel @development-tools
+          # Initialize pacman keys
+          pacman-key --init
+          pacman-key --populate artix
+          
+          # Update mirrorlist with faster mirrors
+          cat > /etc/pacman.d/mirrorlist << 'EOF'
+          Server = https://mirrors.tuna.tsinghua.edu.cn/artixlinux/$repo/os/$arch
+          Server = https://artix.wheaton.edu/repos/$repo/os/$arch
+          Server = https://ftp.cc.uoc.gr/mirrors/linux/artixlinux/$repo/os/$arch
+          EOF
+          
+          # Enable lib32 repository for 32-bit libraries
+          cat >> /etc/pacman.conf << 'EOF'
+          
+          [lib32]
+          Include = /etc/pacman.d/mirrorlist
+          EOF
+          
+          # Install build dependencies
+          pacman -Sy --noconfirm --needed base-devel git curl tar
 
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
