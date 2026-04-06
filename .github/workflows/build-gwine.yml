@@ -69,21 +69,13 @@ jobs:
           # Artix needs to be detected as Arch for wine-tkg dependency resolver
           sed -i 's/^ID=artix$/ID=arch/' /etc/os-release
           
-          # Update mirrorlist with faster mirrors
-          cat > /etc/pacman.d/mirrorlist << 'EOF'
-          Server = https://mirrors.tuna.tsinghua.edu.cn/artixlinux/$repo/os/$arch
-          Server = https://artix.wheaton.edu/repos/$repo/os/$arch
-          Server = https://ftp.cc.uoc.gr/mirrors/linux/artixlinux/$repo/os/$arch
-          EOF
+          # Update mirrorlist with faster mirrors (tested: wheaton, unixpeople, clarkson are fastest)
+          printf '%s\n' 'Server = https://artix.wheaton.edu/repos/$repo/os/$arch' 'Server = https://artix.unixpeople.org/repos/$repo/os/$arch' 'Server = https://mirror.clarkson.edu/artix-linux/repos/$repo/os/$arch' > /etc/pacman.d/mirrorlist
           
           # Enable lib32 repository for 32-bit libraries
-          cat >> /etc/pacman.conf << 'EOF'
+          printf '\n[lib32]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           
-          [lib32]
-          Include = /etc/pacman.d/mirrorlist
-          EOF
-          
-          # Install build dependencies
+          # Install basic tools (wine-tkg resolver will handle the rest)
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
       - name: Clone wine-tkg-git repo and configure variant
@@ -92,6 +84,8 @@ jobs:
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="${{ matrix.variant.preset }}"/g' customization.cfg
+          # Patch deps script to auto-select default provider
+          sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
           ${{ matrix.variant.setup_commands }}
 
       - name: Copy custom patches
