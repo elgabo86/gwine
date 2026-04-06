@@ -66,6 +66,9 @@ jobs:
           pacman-key --init
           pacman-key --populate artix
           
+          # Artix needs to be detected as Arch for wine-tkg dependency resolver
+          sed -i 's/^ID=artix$/ID=arch/' /etc/os-release
+          
           # Update mirrorlist with faster mirrors
           cat > /etc/pacman.d/mirrorlist << 'EOF'
           Server = https://mirrors.tuna.tsinghua.edu.cn/artixlinux/$repo/os/$arch
