@@ -1,8 +1,6 @@
-diff --git a/dlls/winegstreamer/wg_parser.c b/dlls/winegstreamer/wg_parser.c
-index 1111111..2222222 100644
 --- a/dlls/winegstreamer/wg_parser.c
 +++ b/dlls/winegstreamer/wg_parser.c
-@@ -555,6 +555,39 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
+@@ -593,6 +593,39 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
      return GST_AUTOPLUG_SELECT_TRY;
  }
  
@@ -39,13 +37,13 @@ index 1111111..2222222 100644
 +    return FALSE;
 +}
 +
- static void no_more_pads_cb(GstElement *element, gpointer user)
+ static gint find_videoconv_cb(gconstpointer a, gconstpointer b)
  {
-     struct wg_parser *parser = user;
-@@ -1809,6 +1842,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
-     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
+     const GValue *val_a = a, *val_b = b;
+@@ -2119,6 +2152,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
      g_signal_connect(element, "autoplug-continue", G_CALLBACK(autoplug_continue_cb), parser);
      g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
+     g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
 +    g_signal_connect(element, "autoplug-query", G_CALLBACK(autoplug_query_cb), parser);
      g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
      g_signal_connect(element, "deep-element-added", G_CALLBACK(deep_element_added_cb), parser);
