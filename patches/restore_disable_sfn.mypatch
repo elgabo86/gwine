@@ -1,7 +1,8 @@
+diff --git a/dlls/ntdll/unix/file.c b/dlls/ntdll/unix/file.c
+index 1111111..2222222 100644
 --- a/dlls/ntdll/unix/file.c
 +++ b/dlls/ntdll/unix/file.c
-@@ -1608,13 +1608,17 @@ static BOOL append_entry( struct dir_data *data, const char *long_name,
-     if (long_nameW[long_len - 1] == '?') --long_len;
+@@ -1611,13 +1611,17 @@ static BOOL append_entry( struct dir_data *data, const char *long_name,
      long_nameW[long_len] = 0;
  
 -    if (short_name)
@@ -29,6 +30,9 @@
 +        }
      }
      short_nameW[short_len] = 0;
+     wcsupr( short_nameW );
+diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
+index 1111111..2222222 100644
 --- a/dlls/ntdll/unix/loader.c
 +++ b/dlls/ntdll/unix/loader.c
 @@ -2235,6 +2235,7 @@ static int console_callback( void *arg )
@@ -53,6 +57,8 @@
      env_str = getenv("WINE_SIMULATE_ASYNC_READ");
      if (env_str)
          ac_odyssey = !!atoi(env_str);
+diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
+index 1111111..2222222 100644
 --- a/dlls/ntdll/unix/unix_private.h
 +++ b/dlls/ntdll/unix/unix_private.h
 @@ -195,6 +195,7 @@ extern BOOL process_exiting;
