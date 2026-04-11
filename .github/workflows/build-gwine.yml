@@ -114,6 +114,14 @@ jobs:
         run: |
           yes | ./non-makepkg-build.sh
 
+      - name: Show prepare.log on failure
+        if: failure()
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
+        run: |
+          echo "=== prepare.log ==="
+          cat prepare.log 2>/dev/null || echo "prepare.log not found"
+          echo "=== End of prepare.log ==="
+
       - name: Package
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
