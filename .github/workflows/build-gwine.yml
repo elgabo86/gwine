@@ -103,6 +103,7 @@ jobs:
             # Remove proton-specific patches from gwine builds
             if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
               rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
+              rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/restore_disable_sfn.mypatch
               echo "Removed proton-specific patches for gwine build"
             fi
             echo "Copied custom patches from patches directory"
