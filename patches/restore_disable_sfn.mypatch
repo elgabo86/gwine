@@ -1,58 +1,24 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Gwine <gwine@example.com>
 Date: Sat, 11 Apr 2026 00:00:00 +0200
-Subject: [PATCH] Add disable_sfn support for bleeding-edge Wine
+Subject: [PATCH] Add missing disable_sfn declarations for bleeding-edge
 
-This patch adds the disable_sfn variable that allows disabling short
-file name (SFN) generation. This is needed because the GE patch
-02-wine-pending-patch-exp.patch fails to apply to bleeding-edge Wine,
-leaving disable_sfn undeclared.
+This patch adds only the missing declarations for disable_sfn that
+the GE patch 02-wine-pending-patch-exp.patch fails to apply.
+The GE patch successfully applies the usage of disable_sfn in file.c
+and the WINE_DISABLE_SFN code in loader.c, but fails to add the
+declarations.
 
 ---
- dlls/ntdll/unix/file.c          | 12 ++++++++----
- dlls/ntdll/unix/loader.c        |  7 +++++++
- dlls/ntdll/unix/unix_private.h  |  1 +
- 3 files changed, 16 insertions(+), 4 deletions(-)
+ dlls/ntdll/unix/loader.c        | 1 +
+ dlls/ntdll/unix/unix_private.h  | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/dlls/ntdll/unix/file.c b/dlls/ntdll/unix/file.c
-index 1234567..abcdefg 100644
---- a/dlls/ntdll/unix/file.c
-+++ b/dlls/ntdll/unix/file.c
-@@ -1609,14 +1609,18 @@ static BOOL append_entry( struct dir_data *data, const char *long_name,
-     if (long_nameW[long_len - 1] == '?') --long_len;
-     long_nameW[long_len] = 0;
- 
--    if (short_name)
--    {
--        short_len = ntdll_umbstowcs( short_name, strlen(short_name),
--                                     short_nameW, ARRAY_SIZE( short_nameW ) - 1 );
--    }
--    else  /* generate a short name if necessary */
-+    short_len = 0;
-+
-+    if (!disable_sfn)
-     {
--        short_len = 0;
--        if (!is_legal_8dot3_name( long_nameW, long_len ))
--            short_len = hash_short_file_name( long_nameW, long_len, short_nameW );
-+        if (short_name)
-+        {
-+            short_len = ntdll_umbstowcs( short_name, strlen(short_name),
-+                                         short_nameW, ARRAY_SIZE( short_nameW ) - 1 );
-+        }
-+        else  /* generate a short name if necessary */
-+        {
-+            if (!is_legal_8dot3_name( long_nameW, long_len ))
-+                short_len = hash_short_file_name( long_nameW, long_len, short_nameW );
-+        }
-     }
-     short_nameW[short_len] = 0;
-     wcsupr( short_nameW );
 diff --git a/dlls/ntdll/unix/loader.c b/dlls/ntdll/unix/loader.c
 index 1234567..abcdefg 100644
 --- a/dlls/ntdll/unix/loader.c
 +++ b/dlls/ntdll/unix/loader.c
-@@ -2234,6 +2234,7 @@ static void *get_dyld_all_image_info(void)
+@@ -2236,6 +2236,7 @@ static void *get_dyld_all_image_info(void)
  }
  
  BOOL process_termination_delay;
@@ -60,19 +26,6 @@ index 1234567..abcdefg 100644
  BOOL ac_odyssey;
  BOOL fsync_simulate_sched_quantum;
  BOOL alert_simulate_sched_quantum;
-@@ -2257,6 +2258,12 @@ static void hacks_init(void)
-         ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
-     }
- 
-+    env_str = getenv("WINE_DISABLE_SFN");
-+    if (env_str)
-+        disable_sfn = !!atoi(env_str);
-+    else if (main_argc > 1 && (strstr(main_argv[1], "Yakuza5.exe") ))
-+        disable_sfn = TRUE;
-+
-     env_str = getenv("WINE_SIMULATE_ASYNC_READ");
-     if (env_str)
-         ac_odyssey = !!atoi(env_str);
 diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
 index 1234567..abcdefg 100644
 --- a/dlls/ntdll/unix/unix_private.h
