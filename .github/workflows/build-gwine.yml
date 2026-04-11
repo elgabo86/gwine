@@ -116,11 +116,13 @@ jobs:
 
       - name: Show prepare.log on failure
         if: failure()
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           echo "=== prepare.log ==="
-          cat prepare.log 2>/dev/null || echo "prepare.log not found"
+          cat /home/runner/work/wine-tkg-git/wine-tkg-git/prepare.log 2>/dev/null || echo "prepare.log not found"
           echo "=== End of prepare.log ==="
+          echo ""
+          echo "=== Last 100 lines ==="
+          tail -100 /home/runner/work/wine-tkg-git/wine-tkg-git/prepare.log 2>/dev/null || true
 
       - name: Package
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
