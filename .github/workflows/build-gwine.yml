@@ -100,6 +100,11 @@ jobs:
               rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
               echo "Removed gwine-specific patches for proton build"
             fi
+            # Remove proton-specific patches from gwine builds
+            if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
+              rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
+              echo "Removed proton-specific patches for gwine build"
+            fi
             echo "Copied custom patches from patches directory"
           fi
 
