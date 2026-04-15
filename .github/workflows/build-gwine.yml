@@ -86,6 +86,40 @@ jobs:
           # Install basic tools (wine-tkg resolver will handle the rest)
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
+      - name: Build FFmpeg 32-bit for winedmo
+        run: |
+          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs
+          FFMPEG_VER="8.1"
+          FFMPEG_PREFIX="/opt/lib32-ffmpeg"
+          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ
+          cd "ffmpeg-${FFMPEG_VER}"
+          export PKG_CONFIG_PATH="/usr/lib32/pkgconfig:/usr/lib/pkgconfig"
+          export CFLAGS="-m32"
+          export LDFLAGS="-m32 -L/usr/lib32"
+          ./configure \
+            --prefix="${FFMPEG_PREFIX}" \
+            --libdir="${FFMPEG_PREFIX}/lib" \
+            --enable-shared \
+            --disable-static \
+            --disable-doc \
+            --disable-programs \
+            --disable-network \
+            --disable-encoders \
+            --disable-muxers \
+            --disable-filters \
+            --disable-avdevice \
+            --disable-swscale \
+            --disable-libaom \
+            --disable-libdav1d \
+            --disable-libx264 \
+            --disable-libx265 \
+            --disable-libvpx \
+            --target-os=linux \
+            --arch=x86_32
+          make -j$(nproc)
+          make install
+          echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
+
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
         run: |
@@ -95,6 +129,17 @@ jobs:
           # Patch deps script to auto-select default provider
           sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
           ${{ matrix.variant.setup_commands }}
+
+      - name: Inject FFmpeg 32-bit into wine-tkg build
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
+        run: |
+          if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
+            sed -i 's/_proton_winevulkan="false"/_proton_winevulkan="true"/g' customization.cfg
+          fi
+          sed -i '/^_configure_userargs32=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
+          echo "Patched PKG_CONFIG_PATH in build-32.sh for FFmpeg 32-bit detection"
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
@@ -131,6 +176,8 @@ jobs:
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
+          mkdir -p "${{ matrix.variant.name }}-$VERSION/lib32-ffmpeg"
+          cp -a /opt/lib32-ffmpeg/lib/*.so* "${{ matrix.variant.name }}-$VERSION/lib32-ffmpeg/"
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
