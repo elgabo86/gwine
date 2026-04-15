@@ -176,8 +176,7 @@ jobs:
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
-          mkdir -p "${{ matrix.variant.name }}-$VERSION/lib32-ffmpeg"
-          cp -a /opt/lib32-ffmpeg/lib/*.so* "${{ matrix.variant.name }}-$VERSION/lib32-ffmpeg/"
+          cp -a /opt/lib32-ffmpeg/lib/*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/"
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
