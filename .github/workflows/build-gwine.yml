@@ -91,10 +91,12 @@ jobs:
       - name: Copy custom patches
         working-directory: /home/runner/work/
         run: |
-          # Copy .mypatch files from patches directory
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
-            # Copy patches applicable to all variants
+            # Copy .mypatch files to userpatches directory
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
+            # Copy .myrevert files to wine-tkg root so they're processed alongside hotfix .myrevert files
+            # Naming with 0000- prefix ensures they sort before hotfix .myrevert files (0001-)
+            cp "$GITHUB_WORKSPACE/patches"/*.myrevert wine-tkg-git/wine-tkg-git/ 2>/dev/null || true
             # Remove gwine-specific patches from proton builds
             if [[ "${{ matrix.variant.name }}" == gwine-proton* ]]; then
               rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
@@ -103,7 +105,6 @@ jobs:
             # Remove proton-specific patches from gwine builds
             if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
               rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
-              echo "Removed proton-specific patches for gwine build"
             fi
             echo "Copied custom patches from patches directory"
           fi
