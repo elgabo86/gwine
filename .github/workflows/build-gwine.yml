@@ -55,16 +55,14 @@ jobs:
               sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
-              # Replace broken atiadlxx .myrevert hotfixes with git reverts in the reverts file
-              # The upstream .myrevert patches fail because patch -R can't handle evolved code context
-              sed -i '/atiadlxx-ADL2/d' wine-tkg-patches/hotfixes/valve/hotfixes
-              rm -f wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2.myrevert
-              rm -f wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2-2.myrevert
-              if [ "$_LOCAL_PRESET" = "valve-exp-bleeding" ]; then
-                for _hash in 0652a5ad3d966c196cde2dcb902e55f69c7e8ad9 a3d6304e5fe61ee40dbddb483f70154c6bc51604 960b85b804c7a12cca314be60bf02d8a8cb51941 22d7732881bf5ef3fcfe20e5cd591d0d3e285cc6 bd5dd1b6a1ef67176256399684aaa7f52fde9dda 8816f73b6cb2f2a94ba528164850f6f529f0a438 eaa6930f8b9f4162761e24d5ec61474606cce526 7872905a4d924c788916a9591e8b89d74c4b3b33 761730bb6df4feeec9307fe0b5684a39b02cca4c e5597c59ca6d089394a7befd9f9b4061aae2e35e 29c21872ab45e6ea16f4110ae11bb5e3789c362f 5edc831e884; do
-                  echo "_committorevert=$_hash && nonuser_reverter" >> wine-tkg-patches/reverts
-                done
-              fi
+              # Neutralize broken atiadlxx .myrevert hotfixes - they fail with patch -R
+              # because the atiadlxx code has evolved beyond what they can contextually handle
+              # Instead, add all atiadlxx ADL2 commits to the git revert list
+              truncate -s 0 wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2.myrevert
+              truncate -s 0 wine-tkg-patches/hotfixes/valve/fixes/0001-revert-atiadlxx-ADL2-2.myrevert
+              for _hash in 0652a5ad3d966c196cde2dcb902e55f69c7e8ad9 a3d6304e5fe61ee40dbddb483f70154c6bc51604 960b85b804c7a12cca314be60bf02d8a8cb51941 22d7732881bf5ef3fcfe20e5cd591d0d3e285cc6 bd5dd1b6a1ef67176256399684aaa7f52fde9dda 8816f73b6cb2f2a94ba528164850f6f529f0a438 eaa6930f8b9f4162761e24d5ec61474606cce526 7872905a4d924c788916a9591e8b89d74c4b3b33 761730bb6df4feeec9307fe0b5684a39b02cca4c e5597c59ca6d089394a7befd9f9b4061aae2e35e 29c21872ab45e6ea16f4110ae11bb5e3789c362f 5edc831e884; do
+                echo "_committorevert=$_hash && nonuser_reverter" >> wine-tkg-patches/reverts
+              done
 
     steps:
       - name: Checkout repository
