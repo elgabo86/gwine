@@ -118,6 +118,12 @@ jobs:
             --arch=x86_32
           make -j$(nproc)
           make install
+          # Fix rpath to $ORIGIN so FFmpeg .so files find each other at runtime
+          # regardless of install location (works when bundled in wine package)
+          pacman -S --noconfirm --needed patchelf
+          for f in ${FFMPEG_PREFIX}/lib/libav*.so.* ${FFMPEG_PREFIX}/lib/libsw*.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
           echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Clone wine-tkg-git repo and configure variant
@@ -177,6 +183,11 @@ jobs:
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
           cp -a /opt/lib32-ffmpeg/lib/*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/"
+          # Fix rpath on winedmo.dll.so so it finds bundled FFmpeg .so at runtime
+          pacman -S --noconfirm --needed patchelf
+          for f in "${{ matrix.variant.name }}-$VERSION"/lib32/wine/i386-unix/winedmo.dll.so "${{ matrix.variant.name }}-$VERSION"/lib/wine/x86_64-unix/winedmo.dll.so; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
