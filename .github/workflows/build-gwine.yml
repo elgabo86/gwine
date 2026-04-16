@@ -86,19 +86,50 @@ jobs:
           # Install basic tools (wine-tkg resolver will handle the rest)
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
-      - name: Build FFmpeg 32-bit for winedmo
+      - name: Build FFmpeg for winedmo
         run: |
-          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs
+          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs patchelf
           FFMPEG_VER="8.1"
-          FFMPEG_PREFIX="/opt/lib32-ffmpeg"
-          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ
-          cd "ffmpeg-${FFMPEG_VER}"
+          FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
+          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -C /tmp
+          # Build FFmpeg 64-bit
+          cd "${FFMPEG_SRC}"
+          FFMPEG64_PREFIX="/opt/ffmpeg64"
+          ./configure \
+            --prefix="${FFMPEG64_PREFIX}" \
+            --libdir="${FFMPEG64_PREFIX}/lib" \
+            --enable-shared \
+            --disable-static \
+            --disable-doc \
+            --disable-programs \
+            --disable-network \
+            --disable-encoders \
+            --disable-muxers \
+            --disable-filters \
+            --disable-avdevice \
+            --disable-swscale \
+            --disable-libaom \
+            --disable-libdav1d \
+            --disable-libx264 \
+            --disable-libx265 \
+            --disable-libvpx \
+            --target-os=linux \
+            --arch=x86_64
+          make -j$(nproc)
+          make install
+          for f in ${FFMPEG64_PREFIX}/lib/libav*.so.* ${FFMPEG64_PREFIX}/lib/libsw*.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
+          make distclean 2>/dev/null || true
+          # Build FFmpeg 32-bit
+          cd "${FFMPEG_SRC}"
+          FFMPEG32_PREFIX="/opt/ffmpeg32"
           export PKG_CONFIG_PATH="/usr/lib32/pkgconfig:/usr/lib/pkgconfig"
           export CFLAGS="-m32"
           export LDFLAGS="-m32 -L/usr/lib32"
           ./configure \
-            --prefix="${FFMPEG_PREFIX}" \
-            --libdir="${FFMPEG_PREFIX}/lib" \
+            --prefix="${FFMPEG32_PREFIX}" \
+            --libdir="${FFMPEG32_PREFIX}/lib" \
             --enable-shared \
             --disable-static \
             --disable-doc \
@@ -118,13 +149,11 @@ jobs:
             --arch=x86_32
           make -j$(nproc)
           make install
-          # Fix rpath to $ORIGIN so FFmpeg .so files find each other at runtime
-          # regardless of install location (works when bundled in wine package)
-          pacman -S --noconfirm --needed patchelf
-          for f in ${FFMPEG_PREFIX}/lib/libav*.so.* ${FFMPEG_PREFIX}/lib/libsw*.so.*; do
+          for f in ${FFMPEG32_PREFIX}/lib/libav*.so.* ${FFMPEG32_PREFIX}/lib/libsw*.so.*; do
             patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
           done
-          echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
+          echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG32_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
+          echo "FFMPEG64_PKG_CONFIG_PATH=${FFMPEG64_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
@@ -136,7 +165,7 @@ jobs:
           sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
           ${{ matrix.variant.setup_commands }}
 
-      - name: Inject FFmpeg 32-bit into wine-tkg build
+      - name: Inject FFmpeg into wine-tkg build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
@@ -145,7 +174,8 @@ jobs:
           sed -i '/^_configure_userargs32=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
-          echo "Patched PKG_CONFIG_PATH in build-32.sh for FFmpeg 32-bit detection"
+          sed -i "s|export PKG_CONFIG_PATH='/usr/lib64/pkgconfig'|export PKG_CONFIG_PATH='${FFMPEG64_PKG_CONFIG_PATH}:/usr/lib64/pkgconfig'|" wine-tkg-scripts/build-64.sh
+          echo "Patched PKG_CONFIG_PATH in build scripts for FFmpeg detection"
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
@@ -182,12 +212,12 @@ jobs:
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
-          cp -a /opt/lib32-ffmpeg/lib/*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/"
-          # Fix rpath on winedmo.dll.so so it finds bundled FFmpeg .so at runtime
-          pacman -S --noconfirm --needed patchelf
-          for f in "${{ matrix.variant.name }}-$VERSION"/lib32/wine/i386-unix/winedmo.dll.so "${{ matrix.variant.name }}-$VERSION"/lib/wine/x86_64-unix/winedmo.dll.so; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
+          # Bundle FFmpeg .so alongside winedmo.so so $ORIGIN rpath works
+          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/" 2>/dev/null || true
+          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/" 2>/dev/null || true
+          # Fix rpath on winedmo.so so it finds bundled FFmpeg .so at runtime
+          patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/winedmo.so" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
