@@ -80,40 +80,24 @@ jobs:
 
       - name: Build FFmpeg for winedmo
         run: |
-          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs patchelf
+          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs
           FFMPEG_VER="8.1"
           FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
           curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -C /tmp
-          # Build FFmpeg 64-bit
+          FFMPEG_COMMON_OPTS="--enable-static --disable-shared --disable-doc --disable-programs --disable-network --disable-encoders --disable-muxers --disable-filters --disable-avdevice --disable-swscale --disable-libaom --disable-libdav1d --disable-libx264 --disable-libx265 --disable-libvpx --disable-alsa --disable-autodetect"
+          # Build FFmpeg 64-bit (static)
           cd "${FFMPEG_SRC}"
           FFMPEG64_PREFIX="/opt/ffmpeg64"
           ./configure \
             --prefix="${FFMPEG64_PREFIX}" \
             --libdir="${FFMPEG64_PREFIX}/lib" \
-            --enable-shared \
-            --disable-static \
-            --disable-doc \
-            --disable-programs \
-            --disable-network \
-            --disable-encoders \
-            --disable-muxers \
-            --disable-filters \
-            --disable-avdevice \
-            --disable-swscale \
-            --disable-libaom \
-            --disable-libdav1d \
-            --disable-libx264 \
-            --disable-libx265 \
-            --disable-libvpx \
+            ${FFMPEG_COMMON_OPTS} \
             --target-os=linux \
             --arch=x86_64
           make -j$(nproc)
           make install
-          for f in ${FFMPEG64_PREFIX}/lib/libav*.so.* ${FFMPEG64_PREFIX}/lib/libsw*.so.*; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
           make distclean 2>/dev/null || true
-          # Build FFmpeg 32-bit
+          # Build FFmpeg 32-bit (static)
           cd "${FFMPEG_SRC}"
           FFMPEG32_PREFIX="/opt/ffmpeg32"
           export PKG_CONFIG_PATH="/usr/lib32/pkgconfig:/usr/lib/pkgconfig"
@@ -122,28 +106,11 @@ jobs:
           ./configure \
             --prefix="${FFMPEG32_PREFIX}" \
             --libdir="${FFMPEG32_PREFIX}/lib" \
-            --enable-shared \
-            --disable-static \
-            --disable-doc \
-            --disable-programs \
-            --disable-network \
-            --disable-encoders \
-            --disable-muxers \
-            --disable-filters \
-            --disable-avdevice \
-            --disable-swscale \
-            --disable-libaom \
-            --disable-libdav1d \
-            --disable-libx264 \
-            --disable-libx265 \
-            --disable-libvpx \
+            ${FFMPEG_COMMON_OPTS} \
             --target-os=linux \
             --arch=x86_32
           make -j$(nproc)
           make install
-          for f in ${FFMPEG32_PREFIX}/lib/libav*.so.* ${FFMPEG32_PREFIX}/lib/libsw*.so.*; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
           echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG32_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
           echo "FFMPEG64_PKG_CONFIG_PATH=${FFMPEG64_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
 
@@ -164,7 +131,7 @@ jobs:
           sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib64/pkgconfig'|export PKG_CONFIG_PATH='${FFMPEG64_PKG_CONFIG_PATH}:/usr/lib64/pkgconfig'|" wine-tkg-scripts/build-64.sh
-          echo "Patched PKG_CONFIG_PATH in build scripts for FFmpeg detection"
+          echo "Patched PKG_CONFIG_PATH in build scripts for static FFmpeg detection"
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
@@ -201,12 +168,6 @@ jobs:
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
-          # Bundle FFmpeg .so alongside winedmo.so so $ORIGIN rpath works
-          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/" 2>/dev/null || true
-          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/" 2>/dev/null || true
-          # Fix rpath on winedmo.so so it finds bundled FFmpeg .so at runtime
-          patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/winedmo.so" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
