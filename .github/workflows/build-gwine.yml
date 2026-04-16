@@ -168,9 +168,6 @@ jobs:
       - name: Inject FFmpeg into wine-tkg build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
-          if [[ "${{ matrix.variant.name }}" == "gwine" ]]; then
-            sed -i 's/_proton_winevulkan="false"/_proton_winevulkan="true"/g' customization.cfg
-          fi
           sed -i '/^_configure_userargs32=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
