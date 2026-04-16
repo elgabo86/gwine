@@ -81,42 +81,6 @@ jobs:
           # Install basic tools (wine-tkg resolver will handle the rest)
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
-      - name: Build FFmpeg for winedmo
-        run: |
-          pacman -S --noconfirm --needed nasm yasm pkgconf lib32-glibc lib32-gcc-libs
-          FFMPEG_VER="8.1"
-          FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
-          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -C /tmp
-          FFMPEG_COMMON_OPTS="--enable-static --disable-shared --disable-doc --disable-programs --disable-network --disable-encoders --disable-muxers --disable-filters --disable-avdevice --disable-swscale --disable-libaom --disable-libdav1d --disable-libx264 --disable-libx265 --disable-libvpx --disable-alsa --disable-autodetect"
-          # Build FFmpeg 64-bit (static)
-          cd "${FFMPEG_SRC}"
-          FFMPEG64_PREFIX="/opt/ffmpeg64"
-          ./configure \
-            --prefix="${FFMPEG64_PREFIX}" \
-            --libdir="${FFMPEG64_PREFIX}/lib" \
-            ${FFMPEG_COMMON_OPTS} \
-            --target-os=linux \
-            --arch=x86_64
-          make -j$(nproc)
-          make install
-          make distclean 2>/dev/null || true
-          # Build FFmpeg 32-bit (static)
-          cd "${FFMPEG_SRC}"
-          FFMPEG32_PREFIX="/opt/ffmpeg32"
-          export PKG_CONFIG_PATH="/usr/lib32/pkgconfig:/usr/lib/pkgconfig"
-          export CFLAGS="-m32"
-          export LDFLAGS="-m32 -L/usr/lib32"
-          ./configure \
-            --prefix="${FFMPEG32_PREFIX}" \
-            --libdir="${FFMPEG32_PREFIX}/lib" \
-            ${FFMPEG_COMMON_OPTS} \
-            --target-os=linux \
-            --arch=x86_32
-          make -j$(nproc)
-          make install
-          echo "FFMPEG32_PKG_CONFIG_PATH=${FFMPEG32_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
-          echo "FFMPEG64_PKG_CONFIG_PATH=${FFMPEG64_PREFIX}/lib/pkgconfig" >> $GITHUB_ENV
-
       - name: Clone wine-tkg-git repo and configure variant
         working-directory: /home/runner/work/
         run: |
@@ -126,25 +90,6 @@ jobs:
           # Patch deps script to auto-select default provider
           sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
           ${{ matrix.variant.setup_commands }}
-
-      - name: Inject FFmpeg into wine-tkg build
-        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
-        run: |
-          sed -i '/^_configure_userargs32=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
-          sed -i "s|export PKG_CONFIG_PATH='/usr/lib64/pkgconfig'|export PKG_CONFIG_PATH='${FFMPEG64_PKG_CONFIG_PATH}:/usr/lib64/pkgconfig'|" wine-tkg-scripts/build-64.sh
-          # Patch FFmpeg .pc files to use static linking (-l:libfoo.a instead of -lfoo)
-          for prefix in /opt/ffmpeg64 /opt/ffmpeg32; do
-            for pc in ${prefix}/lib/pkgconfig/libav*.pc; do
-              sed -i 's/-lav\([a-z]*\)/-l:libav\1.a/g' "$pc"
-              sed -i 's/-lsw\([a-z]*\)/-l:libsw\1.a/g' "$pc"
-            done
-            # Add transitive deps that static linking requires
-            sed -i '/^Libs_private/s/$/ -lz -lpthread -lm/' ${prefix}/lib/pkgconfig/libavformat.pc 2>/dev/null || true
-            sed -i '/^Libs_private/s/$/ -lz -lpthread -lm/' ${prefix}/lib/pkgconfig/libavcodec.pc 2>/dev/null || true
-          done
-          echo "Patched FFmpeg .pc for static linking"
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
