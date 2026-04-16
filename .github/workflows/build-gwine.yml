@@ -134,7 +134,17 @@ jobs:
           sed -i '/^_configure_userargs64=/s/"$/ --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib32/pkgconfig|export PKG_CONFIG_PATH='${FFMPEG32_PKG_CONFIG_PATH}:/usr/lib32/pkgconfig|" wine-tkg-scripts/build-32.sh
           sed -i "s|export PKG_CONFIG_PATH='/usr/lib64/pkgconfig'|export PKG_CONFIG_PATH='${FFMPEG64_PKG_CONFIG_PATH}:/usr/lib64/pkgconfig'|" wine-tkg-scripts/build-64.sh
-          echo "Patched PKG_CONFIG_PATH in build scripts for static FFmpeg detection"
+          # Patch FFmpeg .pc files to use static linking (-l:libfoo.a instead of -lfoo)
+          for prefix in /opt/ffmpeg64 /opt/ffmpeg32; do
+            for pc in ${prefix}/lib/pkgconfig/libav*.pc; do
+              sed -i 's/-lav\([a-z]*\)/-l:libav\1.a/g' "$pc"
+              sed -i 's/-lsw\([a-z]*\)/-l:libsw\1.a/g' "$pc"
+            done
+            # Add transitive deps that static linking requires
+            sed -i '/^Libs_private/s/$/ -lz -lpthread -lm/' ${prefix}/lib/pkgconfig/libavformat.pc 2>/dev/null || true
+            sed -i '/^Libs_private/s/$/ -lz -lpthread -lm/' ${prefix}/lib/pkgconfig/libavcodec.pc 2>/dev/null || true
+          done
+          echo "Patched FFmpeg .pc for static linking"
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
