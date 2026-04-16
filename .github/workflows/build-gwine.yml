@@ -50,9 +50,6 @@ jobs:
             title: "Gwine Proton"
             package_pattern: wine-tkg*
             setup_commands: |
-              # Enable winevulkan + MF patches from Proton 10 (required for video playback)
-              sed -i 's/_proton_winevulkan="false"/_proton_winevulkan="true"/g' customization.cfg
-              sed -i 's/_proton_mf_patches="false"/_proton_mf_patches="true"/g' customization.cfg
               # Using non-wow64 mode (lib32) for full 32-bit support
               sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
               sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
