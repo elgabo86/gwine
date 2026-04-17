@@ -14,67 +14,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     continue-on-error: true
-    if: github.event_name == 'workflow_dispatch' || matrix.variant.name == 'gwine-proton-beta'
-    container:
-      image: ${{ matrix.variant.container_image }}
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - name: gwine
-            display_name: "Build gwine"
-            container_image: artixlinux/artixlinux:latest
-            preset: none
-            title: Gwine
-            package_pattern: wine-tkg-git-*.g*
-            setup_commands: |
-              sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
-              sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
-              sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
-              sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
-              sed -i 's/_FS_bypass_compositor="false"/_FS_bypass_compositor="true"/g' customization.cfg
-              sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
-              sed -i 's/_proton_mf_patches="false"/_proton_mf_patches="true"/g' customization.cfg
-              sed -i 's/_msvcrt_nativebuiltin="false"/_msvcrt_nativebuiltin="true"/g' customization.cfg
-              sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
-              sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
-              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' wine-tkg-profiles/advanced-customization.cfg
-
-          - name: gwine-proton
-            display_name: "Build gwine-proton"
-            container_image: artixlinux/artixlinux:latest
-            preset: valve-exp-bleeding
-            title: "Gwine Proton"
-            package_pattern: wine-tkg*
-            setup_commands: |
-              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
-
-          - name: gwine-proton-beta
-            display_name: "Build gwine-proton-beta"
-            container_image: fedora:43
-            preset: valve-exp-bleeding
-            title: "Gwine Proton Beta"
-            package_pattern: wine-tkg*
-            setup_commands: |
-              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-              sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
+      - name: Check if variant should run
+        id: gate
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ matrix.variant.name }}" != "gwine-proton-beta" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping: push trigger only builds gwine-proton-beta"
+          fi
+
       - name: Checkout repository
+        if: steps.gate.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Setup environment (Artix)
-        if: matrix.variant.name != 'gwine-proton-beta'
+        if: steps.gate.outputs.skip != 'true' && matrix.variant.name != 'gwine-proton-beta'
         run: |
           pacman-key --init
           pacman-key --populate artix
@@ -84,13 +39,13 @@ jobs:
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
       - name: Setup environment (Fedora)
-        if: matrix.variant.name == 'gwine-proton-beta'
+        if: steps.gate.outputs.skip != 'true' && matrix.variant.name == 'gwine-proton-beta'
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
           dnf install -y glibc-devel.i686 libgcc.i686 zlib-devel.i686 || echo "zlib-devel.i686 not available, FFmpeg 32-bit will build without zlib"
 
       - name: Build FFmpeg for winedmo
-        if: matrix.variant.name == 'gwine-proton-beta'
+        if: steps.gate.outputs.skip != 'true' && matrix.variant.name == 'gwine-proton-beta'
         run: |
           FFMPEG_VER="8.1"
           FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
@@ -146,6 +101,7 @@ jobs:
           done
 
       - name: Clone wine-tkg-git repo and configure variant
+        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
@@ -157,6 +113,7 @@ jobs:
           ${{ matrix.variant.setup_commands }}
 
       - name: Copy custom patches
+        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/
         run: |
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
@@ -173,12 +130,13 @@ jobs:
           fi
 
       - name: Start build
+        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           yes | ./non-makepkg-build.sh
 
       - name: Show prepare.log on failure
-        if: failure()
+        if: failure() && steps.gate.outputs.skip != 'true'
         run: |
           echo "=== prepare.log ==="
           PREPARE_LOG=$(find / -maxdepth 5 -name "prepare.log" -path "*/wine-tkg*" 2>/dev/null | head -1)
@@ -186,6 +144,7 @@ jobs:
           echo "=== End of prepare.log ==="
 
       - name: Package
+        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
@@ -205,6 +164,7 @@ jobs:
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create Release
+        if: steps.gate.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ matrix.variant.name }}-${{ env.EXTRACTED_VERSION }}"
@@ -216,6 +176,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old releases
+        if: steps.gate.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
