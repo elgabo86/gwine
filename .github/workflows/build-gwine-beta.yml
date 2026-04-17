@@ -24,8 +24,10 @@ jobs:
         run: |
           dnf install -y systemd --allowerasing || echo "systemd install skipped"
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 2>/dev/null || true
-          dnf install -y zlib-devel.i686 2>/dev/null || echo "zlib-devel.i686 not available"
+          dnf install -y --allowerasing --skip-broken \
+            glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 \
+            SDL2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 \
+            zlib-devel.i686 libX11-devel.i686 libvulkan-devel.i686 2>/dev/null || true
           echo "=== 32-bit crt check ==="
           ls /usr/lib/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib"
           ls /usr/lib64/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib64"
