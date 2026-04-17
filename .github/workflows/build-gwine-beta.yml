@@ -29,8 +29,11 @@ jobs:
             SDL2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 \
             zlib-devel.i686 libX11-devel.i686 libvulkan-devel.i686 2>/dev/null || true
           echo "=== 32-bit crt check ==="
-          ls /usr/lib/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib"
-          ls /usr/lib64/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib64"
+          find /usr -name "crt1.o" 2>/dev/null
+          echo "=== gcc -m32 test ==="
+          echo 'int main(){return 0;}' | gcc -m32 -x c - -o /tmp/test32 2>&1 || echo "gcc -m32 FAILED"
+          echo "=== 32-bit libs ==="
+          ls -d /usr/lib/crt*.o /usr/lib64/crt*.o 2>/dev/null || echo "No 32-bit crt found"
 
       - name: Build FFmpeg for winedmo
         run: |
