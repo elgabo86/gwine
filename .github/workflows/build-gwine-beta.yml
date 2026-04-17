@@ -1,0 +1,180 @@
+name: build-gwine-beta
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build gwine-proton-beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    container:
+      image: fedora:43
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
+          dnf install -y glibc-devel.i686 libgcc.i686 zlib-devel.i686 || echo "zlib-devel.i686 not available, FFmpeg 32-bit will build without zlib"
+
+      - name: Build FFmpeg for winedmo
+        run: |
+          FFMPEG_VER="8.1"
+          FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
+          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -C /tmp
+
+          FFMPEG64_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-zlib --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
+          FFMPEG32_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
+          if rpm -q zlib-devel.i686 &>/dev/null; then FFMPEG32_OPTS="$FFMPEG32_OPTS --enable-zlib"; fi
+
+          # Build FFmpeg 64-bit
+          cd "${FFMPEG_SRC}"
+          FFMPEG64_PREFIX="/opt/ffmpeg64"
+          ./configure \
+            --prefix="${FFMPEG64_PREFIX}" \
+            --libdir="${FFMPEG64_PREFIX}/lib" \
+            ${FFMPEG64_OPTS} \
+            --target-os=linux \
+            --arch=x86_64
+          make -j$(nproc)
+          make install
+          make distclean 2>/dev/null || true
+
+          # Build FFmpeg 32-bit
+          cd "${FFMPEG_SRC}"
+          FFMPEG32_PREFIX="/opt/ffmpeg32"
+          export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
+          export CFLAGS="-m32"
+          export LDFLAGS="-m32"
+          ./configure \
+            --prefix="${FFMPEG32_PREFIX}" \
+            --libdir="${FFMPEG32_PREFIX}/lib" \
+            ${FFMPEG32_OPTS} \
+            --target-os=linux \
+            --arch=x86_32
+          make -j$(nproc)
+          make install
+
+          # Install .pc files to system pkgconfig dirs so wine-tkg discovers FFmpeg
+          cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/
+          cp /opt/ffmpeg32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/
+
+          # Update linker cache so Wine configure test programs find FFmpeg .so
+          echo "/opt/ffmpeg64/lib" > /etc/ld.so.conf.d/ffmpeg64.conf
+          echo "/opt/ffmpeg32/lib" > /etc/ld.so.conf.d/ffmpeg32.conf
+          ldconfig
+
+          # Set $ORIGIN rpath on FFmpeg .so files (for runtime bundling)
+          for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
+          for f in /opt/ffmpeg32/lib/libav*.so.* /opt/ffmpeg32/lib/libsw*.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
+
+      - name: Clone wine-tkg-git repo and configure
+        working-directory: /home/runner/work/
+        run: |
+          git clone https://github.com/Frogging-Family/wine-tkg-git.git
+          cd wine-tkg-git/wine-tkg-git
+          sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
+          sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+
+      - name: Copy custom patches
+        working-directory: /home/runner/work/
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/patches" ]; then
+            cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
+            echo "Copied custom patches (removed gwine-specific gamepad patch)"
+          fi
+
+      - name: Start build
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
+        run: |
+          yes | ./non-makepkg-build.sh
+
+      - name: Show prepare.log on failure
+        if: failure()
+        run: |
+          echo "=== prepare.log ==="
+          PREPARE_LOG=$(find / -maxdepth 5 -name "prepare.log" -path "*/wine-tkg*" 2>/dev/null | head -1)
+          if [ -n "$PREPARE_LOG" ]; then cat "$PREPARE_LOG"; else echo "prepare.log not found"; fi
+          echo "=== End of prepare.log ==="
+
+      - name: Package
+        working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
+        run: |
+          BUILD_DIR=$(ls -d wine-tkg* | head -n 1)
+          VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
+          mv "$BUILD_DIR" "gwine-proton-beta-$VERSION"
+
+          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib32/wine/i386-unix/" 2>/dev/null || true
+          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib/wine/x86_64-unix/" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib32/wine/i386-unix/winedmo.so" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
+          echo "Bundled FFmpeg .so and set rpath on winedmo.so"
+
+          tar cJvf "gwine-proton-beta-$VERSION.tar.xz" "gwine-proton-beta-$VERSION"
+          mv "gwine-proton-beta-$VERSION.tar.xz" "/tmp/gwine-proton-beta-$VERSION.tar.xz"
+          echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "gwine-proton-beta-${{ env.EXTRACTED_VERSION }}"
+          name: "Gwine Proton Beta ${{ env.EXTRACTED_VERSION }}"
+          files: "/tmp/gwine-proton-beta-${{ env.EXTRACTED_VERSION }}.tar.xz"
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup old releases
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            const betaReleases = releases
+              .filter(r => r.tag_name.startsWith('gwine-proton-beta-'))
+              .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+
+            const releasesToDelete = betaReleases.slice(3);
+
+            for (const release of releasesToDelete) {
+              console.log(`Deleting ${release.tag_name} (${release.name})`);
+
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              });
+
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${release.tag_name}`
+                });
+                console.log(`Tag ${release.tag_name} deleted`);
+              } catch (error) {
+                console.log(`Cannot delete tag ${release.tag_name}: ${error.message}`);
+              }
+            }

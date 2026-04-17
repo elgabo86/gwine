@@ -4,8 +4,6 @@ permissions:
   contents: write
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -14,22 +12,53 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     continue-on-error: true
+    container:
+      image: ${{ matrix.variant.container_image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: gwine
+            display_name: "Build gwine"
+            container_image: artixlinux/artixlinux:latest
+            preset: none
+            title: Gwine
+            package_pattern: wine-tkg-git-*.g*
+            setup_commands: |
+              sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
+              sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
+              sed -i 's/_use_esync="true"/_use_esync="false"/g' customization.cfg
+              sed -i 's/_wayland_driver="false"/_wayland_driver="true"/g' customization.cfg
+              sed -i 's/_FS_bypass_compositor="false"/_FS_bypass_compositor="true"/g' customization.cfg
+              sed -i 's/_proton_fs_hack="false"/_proton_fs_hack="true"/g' customization.cfg
+              sed -i 's/_proton_mf_patches="false"/_proton_mf_patches="true"/g' customization.cfg
+              sed -i 's/_msvcrt_nativebuiltin="false"/_msvcrt_nativebuiltin="true"/g' customization.cfg
+              sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
+              sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
+              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' wine-tkg-profiles/advanced-customization.cfg
+
+          - name: gwine-proton
+            display_name: "Build gwine-proton"
+            container_image: artixlinux/artixlinux:latest
+            preset: valve-exp-bleeding
+            title: "Gwine Proton"
+            package_pattern: wine-tkg*
+            setup_commands: |
+              sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
+              sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus"/' wine-tkg-profiles/advanced-customization.cfg
 
     steps:
-      - name: Check if variant should run
-        id: gate
-        run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ matrix.variant.name }}" != "gwine-proton-beta" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Skipping: push trigger only builds gwine-proton-beta"
-          fi
-
       - name: Checkout repository
-        if: steps.gate.outputs.skip != 'true'
         uses: actions/checkout@v4
 
-      - name: Setup environment (Artix)
-        if: steps.gate.outputs.skip != 'true' && matrix.variant.name != 'gwine-proton-beta'
+      - name: Setup environment
         run: |
           pacman-key --init
           pacman-key --populate artix
@@ -38,82 +67,16 @@ jobs:
           printf '\n[lib32]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Sy --noconfirm --needed base-devel git curl tar
 
-      - name: Setup environment (Fedora)
-        if: steps.gate.outputs.skip != 'true' && matrix.variant.name == 'gwine-proton-beta'
-        run: |
-          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 zlib-devel.i686 || echo "zlib-devel.i686 not available, FFmpeg 32-bit will build without zlib"
-
-      - name: Build FFmpeg for winedmo
-        if: steps.gate.outputs.skip != 'true' && matrix.variant.name == 'gwine-proton-beta'
-        run: |
-          FFMPEG_VER="8.1"
-          FFMPEG_SRC="/tmp/ffmpeg-${FFMPEG_VER}"
-          curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -C /tmp
-
-          FFMPEG64_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-zlib --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
-          FFMPEG32_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
-          if rpm -q zlib-devel.i686 &>/dev/null; then FFMPEG32_OPTS="$FFMPEG32_OPTS --enable-zlib"; fi
-
-          # Build FFmpeg 64-bit
-          cd "${FFMPEG_SRC}"
-          FFMPEG64_PREFIX="/opt/ffmpeg64"
-          ./configure \
-            --prefix="${FFMPEG64_PREFIX}" \
-            --libdir="${FFMPEG64_PREFIX}/lib" \
-            ${FFMPEG64_OPTS} \
-            --target-os=linux \
-            --arch=x86_64
-          make -j$(nproc)
-          make install
-          make distclean 2>/dev/null || true
-
-          # Build FFmpeg 32-bit
-          cd "${FFMPEG_SRC}"
-          FFMPEG32_PREFIX="/opt/ffmpeg32"
-          export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
-          export CFLAGS="-m32"
-          export LDFLAGS="-m32"
-          ./configure \
-            --prefix="${FFMPEG32_PREFIX}" \
-            --libdir="${FFMPEG32_PREFIX}/lib" \
-            ${FFMPEG32_OPTS} \
-            --target-os=linux \
-            --arch=x86_32
-          make -j$(nproc)
-          make install
-
-          # Install .pc files to system pkgconfig dirs so wine-tkg discovers FFmpeg
-          cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/
-          cp /opt/ffmpeg32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/
-
-          # Update linker cache so Wine configure test programs find FFmpeg .so
-          echo "/opt/ffmpeg64/lib" > /etc/ld.so.conf.d/ffmpeg64.conf
-          echo "/opt/ffmpeg32/lib" > /etc/ld.so.conf.d/ffmpeg32.conf
-          ldconfig
-
-          # Set $ORIGIN rpath on FFmpeg .so files (for runtime bundling)
-          for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
-          for f in /opt/ffmpeg32/lib/libav*.so.* /opt/ffmpeg32/lib/libsw*.so.*; do
-            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
-          done
-
       - name: Clone wine-tkg-git repo and configure variant
-        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="${{ matrix.variant.preset }}"/g' customization.cfg
-          if command -v pacman &>/dev/null; then
-            sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
-          fi
+          sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
           ${{ matrix.variant.setup_commands }}
 
       - name: Copy custom patches
-        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/
         run: |
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
@@ -130,13 +93,12 @@ jobs:
           fi
 
       - name: Start build
-        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           yes | ./non-makepkg-build.sh
 
       - name: Show prepare.log on failure
-        if: failure() && steps.gate.outputs.skip != 'true'
+        if: failure()
         run: |
           echo "=== prepare.log ==="
           PREPARE_LOG=$(find / -maxdepth 5 -name "prepare.log" -path "*/wine-tkg*" 2>/dev/null | head -1)
@@ -144,27 +106,16 @@ jobs:
           echo "=== End of prepare.log ==="
 
       - name: Package
-        if: steps.gate.outputs.skip != 'true'
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/non-makepkg-builds/
         run: |
           BUILD_DIR=$(ls -d ${{ matrix.variant.package_pattern }} | head -n 1)
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "${{ matrix.variant.name }}-$VERSION"
-
-          if [[ "${{ matrix.variant.name }}" == "gwine-proton-beta" ]]; then
-            cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/" 2>/dev/null || true
-            cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/" 2>/dev/null || true
-            patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib32/wine/i386-unix/winedmo.so" 2>/dev/null || true
-            patchelf --set-rpath '$ORIGIN' "${{ matrix.variant.name }}-$VERSION/lib/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
-            echo "Bundled FFmpeg .so and set rpath on winedmo.so"
-          fi
-
           tar cJvf "${{ matrix.variant.name }}-$VERSION.tar.xz" "${{ matrix.variant.name }}-$VERSION"
           mv "${{ matrix.variant.name }}-$VERSION.tar.xz" "/tmp/${{ matrix.variant.name }}-$VERSION.tar.xz"
           echo "EXTRACTED_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create Release
-        if: steps.gate.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ matrix.variant.name }}-${{ env.EXTRACTED_VERSION }}"
@@ -176,7 +127,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old releases
-        if: steps.gate.outputs.skip != 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -189,13 +139,12 @@ jobs:
 
             const variants = {
               'gwine': [],
-              'gwine-proton': [],
-              'gwine-proton-beta': []
+              'gwine-proton': []
             };
 
             releases.forEach(release => {
               if (release.tag_name.startsWith('gwine-proton-beta-')) {
-                variants['gwine-proton-beta'].push(release);
+                return;
               } else if (release.tag_name.startsWith('gwine-proton-')) {
                 variants['gwine-proton'].push(release);
               } else if (release.tag_name.startsWith('gwine-')) {
