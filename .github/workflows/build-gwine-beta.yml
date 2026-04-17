@@ -22,7 +22,7 @@ jobs:
 
       - name: Setup environment
         run: |
-          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-ng-compat-devel
+          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-ng-compat-devel wayland-devel libxkbcommon-devel
           dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 zlib-ng-compat-devel.i686 wayland-devel.i686 libxkbcommon-devel.i686
 
           # i686 packages that conflict with x86_64 (same .gir files in /usr/share/gir-1.0/)
