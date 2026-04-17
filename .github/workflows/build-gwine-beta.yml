@@ -23,10 +23,13 @@ jobs:
       - name: Setup environment
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 2>/dev/null || true
-          dnf install -y zlib-devel.i686 2>/dev/null || true
-          echo "=== 32-bit crt check ==="
-          find /usr -name "crt1.o" 2>/dev/null
+          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 || true
+          dnf install -y zlib-devel.i686 || true
+          dnf install -y SDL2-devel.i686 || true
+          dnf install -y gstreamer1-devel.i686 || true
+          dnf install -y gstreamer1-plugins-base-devel.i686 || true
+          dnf install -y libX11-devel.i686 || true
+          dnf install -y libvulkan-devel.i686 || true
           echo "=== gcc -m32 test ==="
           echo 'int main(){return 0;}' | gcc -m32 -x c - -o /tmp/test32 2>&1 || echo "gcc -m32 FAILED"
 
