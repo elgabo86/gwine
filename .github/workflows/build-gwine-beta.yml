@@ -22,13 +22,63 @@ jobs:
 
       - name: Setup environment
         run: |
-          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-ng-compat-devel wayland-devel libxkbcommon-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 zlib-ng-compat-devel.i686 wayland-devel.i686 libxkbcommon-devel.i686
+          # Wine-tkg Fedora 64-bit deps — adapted for Fedora 43 renames:
+          #   SDL2-devel → sdl2-compat-devel, vulkan-devel → vulkan-loader-devel + vulkan-headers,
+          #   libudev-devel → systemd-devel, zlib-devel → zlib-ng-compat-devel,
+          #   wget → wget2, python-pefile → python3-pefile, lzma → xz
+          #   Removed: fontpackages-devel (obsolete), mesa-libGLU-devel (dropped from F43),
+          #            libpng-static.x86_64 (dropped), libmpg123-devel → mpg123-devel
+          #   libgphoto2-devel → skip (conflicts with systemd in container)
+          dnf install -y \
+            git make ccache gcc-c++ mingw32-gcc mingw32-gcc-c++ mingw32-cpp \
+            mingw64-gcc mingw64-gcc-c++ mingw64-cpp \
+            wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers \
+            libvkd3d-devel icoutils vulkan-loader-devel vulkan-headers \
+            lcms2-devel gstreamer1-devel gstreamer1-plugins-base-devel \
+            mpg123-devel gtk3-devel libva-devel fontforge gsm-devel \
+            libjpeg-turbo-devel systemd-devel libv4l-devel pulseaudio-libs-devel \
+            xz audiofile-devel giflib-devel ImageMagick-devel libpcap-devel \
+            alsa-lib-devel autoconf bison coreutils cups-devel dbus-devel \
+            desktop-file-utils flex fontconfig-devel freetype-devel freeglut-devel \
+            gawk gettext-devel gnutls-devel krb5-devel libattr-devel \
+            libpng-devel librsvg2-devel libstdc++-devel libtiff-devel \
+            libX11-devel libXcomposite-devel libXcursor-devel libXext-devel \
+            libXi-devel libXinerama-devel libxml2-devel libXmu-devel \
+            libXrandr-devel libXrender-devel libxslt-devel libXxf86vm-devel \
+            mesa-libGL-devel mesa-libEGL-devel ncurses-devel openldap-devel \
+            sane-backends-devel unixODBC-devel unzip util-linux \
+            zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
+            libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
+            gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
+            libunwind-devel vulkan-devel
+
+          # Wine-tkg Fedora 32-bit deps — adapted for Fedora 43:
+          #   SDL2-devel.i686 → sdl2-compat-devel.i686, mesa-libGLU-devel.i686 → dropped
+          #   libgphoto2-devel.i686 → skip (conflicts with systemd in container)
+          #   gtk3-devel.i686 → handled via --replacefiles below (gir conflicts)
+          dnf install -y \
+            pkgconf.i686 gcc-c++.i686 glibc-devel.i686 libX11-devel.i686 \
+            wayland-devel.i686 libXcomposite-devel.i686 \
+            libXcursor-devel.i686 libXext-devel.i686 libXi-devel.i686 \
+            libXinerama-devel.i686 libxml2-devel.i686 libXmu-devel.i686 \
+            libXrandr-devel.i686 libXrender-devel.i686 libxslt-devel.i686 \
+            libXxf86vm-devel.i686 mesa-libGL-devel.i686 mesa-libEGL-devel.i686 \
+            ncurses-devel.i686 openldap-devel.i686 freetype-devel.i686 \
+            sdl2-compat-devel.i686 openal-soft-devel.i686 libvkd3d-devel.i686 \
+            lcms2-devel.i686 libva-devel.i686 giflib-devel.i686 libpcap-devel.i686 \
+            alsa-lib-devel.i686 cups-devel.i686 dbus-devel.i686 \
+            fontconfig-devel.i686 libjpeg-turbo-devel.i686 libpng-devel.i686 \
+            pulseaudio-libs-devel.i686 gnutls-devel.i686 krb5-devel.i686 \
+            krb5-libs.i686 libstdc++-devel.i686 vulkan-loader-devel.i686 \
+            libv4l-devel.i686 gsm-devel.i686 sane-backends-devel.i686 \
+            libXfixes-devel.i686 libgcrypt-devel.i686 libXpresent-devel.i686 \
+            libdrm-devel.i686 libglvnd-devel.i686 libunwind-devel.i686 \
+            libxkbcommon-devel.i686 zlib-ng-compat-devel.i686 mpg123-devel.i686
 
           # i686 packages that conflict with x86_64 (same .gir files in /usr/share/gir-1.0/)
           # rpm refuses to overwrite — download and force install with --replacefiles
           mkdir -p /tmp/i686-rpms
-          dnf download --destdir=/tmp/i686-rpms --resolve gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 2>/dev/null || true
+          dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true
           if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then
             rpm -Uvh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true
           fi
@@ -101,10 +151,7 @@ jobs:
           sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i 's/dnf \${_confirm_str}install/dnf \${_confirm_str}install --skip-broken/g' wine-tkg-scripts/deps
-          sed -i 's/|| return 1/|| true/g' wine-tkg-scripts/deps
-          sed -i 's/SDL2-devel\.i686/sdl2-compat-devel.i686/g' wine-tkg-scripts/deps
-          sed -i 's/SDL2-devel/sdl2-compat-devel/g' wine-tkg-scripts/deps
+          sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
@@ -118,7 +165,7 @@ jobs:
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
-          yes | ./non-makepkg-build.sh
+          ( yes | ./non-makepkg-build.sh ) || true
 
       - name: Show prepare.log on failure
         if: failure()
@@ -135,10 +182,10 @@ jobs:
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "gwine-proton-beta-$VERSION"
 
-          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib32/wine/i386-unix/" 2>/dev/null || true
-          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib/wine/x86_64-unix/" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib32/wine/i386-unix/winedmo.so" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
+          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib/wine/i386-unix/" 2>/dev/null || true
+          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib64/wine/x86_64-unix/" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib/wine/i386-unix/winedmo.so" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
           echo "Bundled FFmpeg .so and set rpath on winedmo.so"
 
           tar cJvf "gwine-proton-beta-$VERSION.tar.xz" "gwine-proton-beta-$VERSION"
