@@ -23,15 +23,15 @@ jobs:
       - name: Setup environment
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 || true
-          dnf install -y zlib-devel.i686 || true
-          dnf install -y SDL2-devel.i686 || true
-          dnf install -y gstreamer1-devel.i686 || true
-          dnf install -y gstreamer1-plugins-base-devel.i686 || true
-          dnf install -y libX11-devel.i686 || true
-          dnf install -y libvulkan-devel.i686 || true
+          # Critical 32-bit toolchain — fail if missing
+          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686
+          # Critical 32-bit Wine deps — fail if missing
+          dnf install -y libX11-devel.i686 libvulkan-devel.i686 SDL2-devel.i686
+          # Optional 32-bit — winegstreamer (winedmo replaces it for video)
+          dnf install -y gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 || echo "WARNING: gstreamer 32-bit not available, winegstreamer disabled (winedmo handles video)"
+          dnf install -y zlib-devel.i686 || echo "WARNING: zlib 32-bit not available"
           echo "=== gcc -m32 test ==="
-          echo 'int main(){return 0;}' | gcc -m32 -x c - -o /tmp/test32 2>&1 || echo "gcc -m32 FAILED"
+          echo 'int main(){return 0;}' | gcc -m32 -x c - -o /tmp/test32 2>&1 || { echo "FATAL: gcc -m32 broken"; exit 1; }
 
       - name: Build FFmpeg for winedmo
         run: |
