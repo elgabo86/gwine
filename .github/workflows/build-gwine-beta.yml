@@ -23,11 +23,7 @@ jobs:
       - name: Setup environment
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          # Pre-install 32-bit toolchain and critical Wine deps that wine-tkg expects
-          # wine-tkg deps script will install the rest, but these must be present upfront
           dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686
-          dnf install -y libX11-devel.i686 mesa-libGL-devel.i686 wayland-devel.i686 \
-            libxkbcommon-devel.i686 vulkan-loader-devel.i686 SDL2-devel.i686
 
       - name: Build FFmpeg for winedmo
         run: |
@@ -96,8 +92,8 @@ jobs:
           sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i 's/dnf \${_confirm_str}install/dnf \${_confirm_str}install --allowerasing --skip-broken/g' wine-tkg-scripts/deps
-          sed -i 's/_install_pkg "\${PKG}" "\${_confirm}" || return 1/_install_pkg "\${PKG}" "\${_confirm}" || true/g' wine-tkg-scripts/deps
+          sed -i 's/dnf \${_confirm_str}install/dnf \${_confirm_str}install --skip-broken/g' wine-tkg-scripts/deps
+          sed -i 's/|| return 1/|| true/g' wine-tkg-scripts/deps
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
