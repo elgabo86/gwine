@@ -22,8 +22,8 @@ jobs:
 
       - name: Setup environment
         run: |
-          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686
+          dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-ng-compat-devel
+          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 zlib-ng-compat-devel.i686
 
           # i686 packages that conflict with x86_64 (same .gir files in /usr/share/gir-1.0/)
           # rpm refuses to overwrite — download and force install with --replacefiles
@@ -42,7 +42,7 @@ jobs:
 
           FFMPEG64_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-zlib --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
           FFMPEG32_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc"
-          if rpm -q zlib-devel.i686 &>/dev/null; then FFMPEG32_OPTS="$FFMPEG32_OPTS --enable-zlib"; fi
+          if rpm -q zlib-ng-compat-devel.i686 &>/dev/null; then FFMPEG32_OPTS="$FFMPEG32_OPTS --enable-zlib"; fi
 
           # Build FFmpeg 64-bit
           cd "${FFMPEG_SRC}"
