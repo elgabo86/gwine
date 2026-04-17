@@ -23,7 +23,11 @@ jobs:
       - name: Setup environment
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
-          dnf install -y glibc-devel.i686 libgcc.i686 zlib-devel.i686 || echo "zlib-devel.i686 not available, FFmpeg 32-bit will build without zlib"
+          dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 2>/dev/null || true
+          dnf install -y zlib-devel.i686 2>/dev/null || echo "zlib-devel.i686 not available"
+          echo "=== 32-bit crt check ==="
+          ls /usr/lib/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib"
+          ls /usr/lib64/crt*.o 2>/dev/null || echo "No 32-bit crt in /usr/lib64"
 
       - name: Build FFmpeg for winedmo
         run: |
@@ -53,13 +57,15 @@ jobs:
           FFMPEG32_PREFIX="/opt/ffmpeg32"
           export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
           export CFLAGS="-m32"
-          export LDFLAGS="-m32"
+          export LDFLAGS="-m32 -L/usr/lib"
           ./configure \
             --prefix="${FFMPEG32_PREFIX}" \
             --libdir="${FFMPEG32_PREFIX}/lib" \
             ${FFMPEG32_OPTS} \
             --target-os=linux \
-            --arch=x86_32
+            --arch=x86_32 \
+            --host-cflags="-m32" \
+            --host-ldflags="-m32 -L/usr/lib"
           make -j$(nproc)
           make install
 
