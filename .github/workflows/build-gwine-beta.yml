@@ -94,6 +94,8 @@ jobs:
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/dnf \${_confirm_str}install/dnf \${_confirm_str}install --skip-broken/g' wine-tkg-scripts/deps
           sed -i 's/|| return 1/|| true/g' wine-tkg-scripts/deps
+          sed -i 's/SDL2-devel\.i686/sdl2-compat-devel.i686/g' wine-tkg-scripts/deps
+          sed -i 's/SDL2-devel/sdl2-compat-devel/g' wine-tkg-scripts/deps
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
