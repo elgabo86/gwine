@@ -22,6 +22,7 @@ jobs:
 
       - name: Setup environment
         run: |
+          dnf install -y systemd --allowerasing || echo "systemd install skipped"
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
           dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686 2>/dev/null || true
           dnf install -y zlib-devel.i686 2>/dev/null || echo "zlib-devel.i686 not available"
@@ -96,7 +97,8 @@ jobs:
           sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i 's/dnf install/dnf install --allowerasing --skip-broken/g' wine-tkg-scripts/deps
+          sed -i 's/dnf \${_confirm_str}install/dnf \${_confirm_str}install --allowerasing --skip-broken/g' wine-tkg-scripts/deps
+          sed -i 's/_install_pkg "\${PKG}" "\${_confirm}" || return 1/_install_pkg "\${PKG}" "\${_confirm}" || true/g' wine-tkg-scripts/deps
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
