@@ -96,6 +96,7 @@ jobs:
           sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/dnf install/dnf install --allowerasing --skip-broken/g' wine-tkg-scripts/deps
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
