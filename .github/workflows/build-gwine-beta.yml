@@ -24,9 +24,15 @@ jobs:
         run: |
           dnf install -y git curl tar patchelf nasm yasm pkgconf-pkg-config gcc gcc-c++ make zlib-devel
           dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686
-          # Debug: try i686 packages that wine-tkg fails on to see the actual dependency errors
-          dnf install -y gstreamer1-devel.i686 2>&1 || echo "WARNING: gstreamer1-devel.i686 failed, see error above"
-          dnf install -y sdl2-compat-devel.i686 2>&1 || echo "WARNING: sdl2-compat-devel.i686 failed, see error above"
+
+          # i686 packages that conflict with x86_64 (same .gir files in /usr/share/gir-1.0/)
+          # rpm refuses to overwrite — download and force install with --replacefiles
+          mkdir -p /tmp/i686-rpms
+          dnf download --destdir=/tmp/i686-rpms --resolve gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 2>/dev/null || true
+          if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then
+            rpm -Uvh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true
+          fi
+          rm -rf /tmp/i686-rpms
 
       - name: Build FFmpeg for winedmo
         run: |
