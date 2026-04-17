@@ -26,7 +26,8 @@ jobs:
           # Critical 32-bit toolchain — fail if missing
           dnf install -y glibc-devel.i686 libgcc.i686 libstdc++-devel.i686
           # Critical 32-bit Wine deps — fail if missing
-          dnf install -y libX11-devel.i686 libvulkan-devel.i686 SDL2-devel.i686
+          dnf install -y libX11-devel.i686 libvulkan-devel.i686 SDL2-devel.i686 \
+            wayland-devel.i686 libxkbcommon-devel.i686 libwayland-client-devel.i686
           # Optional 32-bit — winegstreamer (winedmo replaces it for video)
           dnf install -y gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 || echo "WARNING: gstreamer 32-bit not available, winegstreamer disabled (winedmo handles video)"
           dnf install -y zlib-devel.i686 || echo "WARNING: zlib 32-bit not available"
