@@ -6,8 +6,7 @@ RUN dnf upgrade -y && \
   mingw64-gcc mingw64-gcc-c++ mingw64-cpp \
   wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers \
   libvkd3d-devel icoutils vulkan-loader-devel vulkan-headers \
-  lcms2-devel gstreamer1-devel gstreamer1-plugins-base-devel \
-  mpg123-devel gtk3-devel libva-devel fontforge gsm-devel \
+  lcms2-devel mpg123-devel libva-devel fontforge gsm-devel \
   libjpeg-turbo-devel systemd-devel libv4l-devel pulseaudio-libs-devel \
   xz audiofile-devel giflib-devel ImageMagick-devel libpcap-devel \
   alsa-lib-devel autoconf bison coreutils cups-devel dbus-devel \
@@ -22,7 +21,8 @@ RUN dnf upgrade -y && \
   zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
   libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
   gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-  libunwind-devel vulkan-devel && \
+  libunwind-devel vulkan-devel meson && \
+  dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel && \
   dnf install -y \
   pkgconf.i686 gcc-c++.i686 glibc-devel.i686 libX11-devel.i686 \
   wayland-devel.i686 libXcomposite-devel.i686 \
@@ -40,11 +40,15 @@ RUN dnf upgrade -y && \
   libv4l-devel.i686 gsm-devel.i686 sane-backends-devel.i686 \
   libXfixes-devel.i686 libgcrypt-devel.i686 libXpresent-devel.i686 \
   libdrm-devel.i686 libglvnd-devel.i686 libunwind-devel.i686 \
-  libxkbcommon-devel.i686 zlib-ng-compat-devel.i686 mpg123-devel.i686 && \
+  libxkbcommon-devel.i686 zlib-ng-compat-devel.i686 mpg123-devel.i686 \
+  orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
+  pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
+  libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
+  systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 && \
   mkdir -p /tmp/i686-rpms && \
   dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true; \
   if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then \
-    rpm -Uvh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true; \
+    rpm -ivh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true; \
   fi; \
   rm -rf /tmp/i686-rpms
 
@@ -69,5 +73,30 @@ RUN cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/ && \
     ldconfig && \
     for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done && \
     for f in /opt/ffmpeg32/lib/libav*.so.* /opt/ffmpeg32/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done
+
+ARG GST_LIBAV_VER=1.26.11
+
+RUN dnf install -y meson && \
+    curl -L "https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-${GST_LIBAV_VER}.tar.xz" | tar xJ -C /tmp && \
+    cd /tmp/gst-libav-${GST_LIBAV_VER} && \
+    PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
+    meson setup build64 \
+      --prefix=/opt/gst-libav64 \
+      --buildtype=release && \
+    meson compile -C build64 -j$(nproc) && \
+    meson install -C build64 && \
+    rm -rf build64 && \
+    PKG_CONFIG_PATH="/opt/ffmpeg32/lib/pkgconfig:/usr/lib/pkgconfig" \
+    CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib" \
+    meson setup build32 \
+      --prefix=/opt/gst-libav32 \
+      --libdir=/opt/gst-libav32/lib \
+      --buildtype=release && \
+    meson compile -C build32 -j$(nproc) && \
+    meson install -C build32 && \
+    rm -rf /tmp/gst-libav-${GST_LIBAV_VER}
+
+RUN for f in /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true; done && \
+    for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true; done
 
 WORKDIR /build

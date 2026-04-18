@@ -50,7 +50,10 @@ jobs:
             zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
             libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
             gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-            libunwind-devel vulkan-devel
+            libunwind-devel vulkan-devel meson
+
+          # x86_64 gstreamer/gtk3 MUST be installed BEFORE i686 deps (libstdc++ version conflict)
+          dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel
 
           # Wine-tkg Fedora 32-bit deps — adapted for Fedora 43:
           #   SDL2-devel.i686 → sdl2-compat-devel.i686, mesa-libGLU-devel.i686 → dropped
@@ -73,14 +76,18 @@ jobs:
             libv4l-devel.i686 gsm-devel.i686 sane-backends-devel.i686 \
             libXfixes-devel.i686 libgcrypt-devel.i686 libXpresent-devel.i686 \
             libdrm-devel.i686 libglvnd-devel.i686 libunwind-devel.i686 \
-            libxkbcommon-devel.i686 zlib-ng-compat-devel.i686 mpg123-devel.i686
+            libxkbcommon-devel.i686 zlib-ng-compat-devel.i686 mpg123-devel.i686 \
+            orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
+            pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
+            libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
+            systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686
 
           # i686 packages that conflict with x86_64 (same .gir files in /usr/share/gir-1.0/)
           # rpm refuses to overwrite — download and force install with --replacefiles
           mkdir -p /tmp/i686-rpms
           dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true
           if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then
-            rpm -Uvh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true
+            rpm -ivh --replacefiles --nodeps /tmp/i686-rpms/*.rpm 2>/dev/null || true
           fi
           rm -rf /tmp/i686-rpms
 
@@ -141,6 +148,41 @@ jobs:
             patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
           done
 
+      - name: Build gst-libav for winegstreamer
+        run: |
+          dnf install -y meson
+          GST_LIBAV_VER="1.26.11"
+          curl -L "https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-${GST_LIBAV_VER}.tar.xz" | tar xJ -C /tmp
+          cd "/tmp/gst-libav-${GST_LIBAV_VER}"
+
+          # Build gst-libav 64-bit against our FFmpeg
+          PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
+          meson setup build64 \
+            --prefix=/opt/gst-libav64 \
+            --buildtype=release
+          meson compile -C build64 -j$(nproc)
+          meson install -C build64
+          rm -rf build64
+
+          # Build gst-libav 32-bit against our FFmpeg
+          PKG_CONFIG_PATH="/opt/ffmpeg32/lib/pkgconfig:/usr/lib/pkgconfig" \
+          CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib" \
+          meson setup build32 \
+            --prefix=/opt/gst-libav32 \
+            --libdir=/opt/gst-libav32/lib \
+            --buildtype=release
+          meson compile -C build32 -j$(nproc)
+          meson install -C build32
+          rm -rf "/tmp/gst-libav-${GST_LIBAV_VER}"
+
+          # Set rpath on GStreamer plugins to find our bundled FFmpeg
+          for f in /opt/gst-libav64/lib/gstreamer-1.0/libgst*.so; do
+            patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true
+          done
+          for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do
+            patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true
+          done
+
       - name: Clone wine-tkg-git repo and configure
         working-directory: /home/runner/work/
         run: |
@@ -186,7 +228,13 @@ jobs:
           cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "gwine-proton-beta-$VERSION/lib64/wine/x86_64-unix/" 2>/dev/null || true
           patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib/wine/i386-unix/winedmo.so" 2>/dev/null || true
           patchelf --set-rpath '$ORIGIN' "gwine-proton-beta-$VERSION/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
-          echo "Bundled FFmpeg .so and set rpath on winedmo.so"
+
+          mkdir -p "gwine-proton-beta-$VERSION/lib32/gstreamer-1.0" "gwine-proton-beta-$VERSION/lib64/gstreamer-1.0"
+          cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "gwine-proton-beta-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
+          cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-beta-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
+          for f in "gwine-proton-beta-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-beta-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+          echo "Bundled FFmpeg .so, GStreamer plugins, and set rpath on winedmo.so"
 
           tar cJvf "gwine-proton-beta-$VERSION.tar.xz" "gwine-proton-beta-$VERSION"
           mv "gwine-proton-beta-$VERSION.tar.xz" "/tmp/gwine-proton-beta-$VERSION.tar.xz"
