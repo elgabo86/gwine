@@ -51,19 +51,22 @@ cd /build/wine-tkg-git/wine-tkg-git
 
 BUILD_DIR=$(ls -d non-makepkg-builds/wine-tkg-git-* | head -n 1)
 VERSION=$(basename "$BUILD_DIR" | sed 's/^wine-tkg-git-//')
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 DEST="gwine-test-${VERSION:-unknown}"
 
 cp -a "$BUILD_DIR" "/build/${DEST}"
 
-cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "/build/${DEST}/lib/wine/i386-unix/" 2>/dev/null || true
+UNIX32=$(ls -d "/build/${DEST}"/lib/wine/i386-unix "/build/${DEST}"/lib64/wine/i386-unix 2>/dev/null | head -n 1)
+cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
 cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "/build/${DEST}/lib64/wine/x86_64-unix/" 2>/dev/null || true
-patchelf --set-rpath '$ORIGIN' "/build/${DEST}/lib/wine/i386-unix/winedmo.so" 2>/dev/null || true
+patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
 patchelf --set-rpath '$ORIGIN' "/build/${DEST}/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
 
-mkdir -p "/build/${DEST}/lib32/gstreamer-1.0" "/build/${DEST}/lib64/gstreamer-1.0"
-cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "/build/${DEST}/lib32/gstreamer-1.0/" 2>/dev/null || true
+GST32=$(ls -d "/build/${DEST}"/lib32/gstreamer-1.0 "/build/${DEST}"/lib/gstreamer-1.0 2>/dev/null | head -n 1)
+mkdir -p "${GST32}" "/build/${DEST}/lib64/gstreamer-1.0"
+cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "${GST32}/" 2>/dev/null || true
 cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstreamer-1.0/" 2>/dev/null || true
-for f in "/build/${DEST}/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
+for f in "${GST32}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
 for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
 
 mv "/build/${DEST}" "/output/gwine-${TIMESTAMP}"

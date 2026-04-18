@@ -8,7 +8,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 
 | Variant | Base | Container CI | winedmo | Description |
 |---------|------|-------------|---------|-------------|
-| gwine | Wine mainline + staging | artixlinux/artixlinux:latest | Non (upstream n'a pas le code) | Build Wine classique |
+| gwine | Wine mainline + staging | artixlinux/artixlinux:latest | Non (topology_loader stub) | Build Wine classique, pas de vidéo MF |
 | gwine-proton | Valve proton-experimental-bleeding-edge | fedora:43 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
 
 ## Fichiers importants
@@ -55,7 +55,7 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - **Solution** : bundler `gst-libav` (plugin GStreamer qui wrappe FFmpeg) compilé contre notre FFmpeg custom
 
 **Pourquoi seulement sur gwine-proton :**
-- L'arbre Wine upstream (gwine) n'a pas le code winedmo
+- L'arbre Wine upstream (gwine) a winedmo et winegstreamer mais le `topology_loader` de mfplat est un **stub** — il ne connecte pas winedmo → winegstreamer. Résultat : les vidéos MF ne marchent pas, peu importe le bundling FFmpeg/gst-libav. Valve a implémenté le topology loader complet dans son arbre Proton uniquement.
 - gwine-proton utilise Fedora 43 → même glibc que le système cible (uBlue)
 
 **FFmpeg est compilé en shared (.so)** avec les flags GE-Proton :
