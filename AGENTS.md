@@ -41,7 +41,7 @@ L'output va dans `/tmp/gwine-output/gwine-proton-{timestamp}/` (ou `gwine-{times
 
 **Notes techniques :**
 - `podman run -i` requis pour passer le script via heredoc stdin
-- Volume output monté avec `:z` (SELinux sur Kinoite)
+- **Volumes SELinux** : sur Kinoite, TOUS les volumes montés dans le conteneur doivent avoir le flag `:z` (ou `:ro,z` pour read-only). Sans `:z`, le conteneur ne peut pas lire les fichiers (Permission denied silencieux). Le volume patches (`/patches:ro,z`) et output (`/output:z`) le sont déjà — ne pas oublier pour tout nouveau volume.
 - `non-makepkg-build.sh` appelé dans un subshell `( yes | ./non-makepkg-build.sh ) || true` car le script appelle `exit` à la fin
 
 ## winedmo (Media Foundation FFmpeg backend)
@@ -144,11 +144,13 @@ Le bug est côté **input** (push des données encodées dans le pipeline GStrea
 - `maxsize` → `max((gsize)sample->max_size, (gsize)sample->size)` — garantit maxsize >= size
 - `size` → toujours `sample->size` au lieu de `sample->stride ? sample->max_size : sample->size` — utilise la vraie taille des données
 
-**Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. **En attente de validation runtime** — les builds précédents avaient un patch avec du fuzz qui était silencieusement rejeté par `patch -Np1`. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
+**Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. **En attente de validation runtime** — les 3 premiers builds ont échoué à cause du volume SELinux (voir ci-dessous), le patch n'a jamais été copié dans le conteneur. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
 
 **Portée** : **local uniquement** — test via Podman (`test-build.sh`). Le patch n'est **pas** appliqué sur les builds CI (GitHub Actions) pour le moment.
 
 **Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
+
+**Note sur les volumes SELinux** : le volume `/patches` était monté avec `:ro` au lieu de `:ro,z`, ce qui causait un Permission denied silencieux. Le conteneur ne pouvait pas lire les patches, le `cp` échouait silencieusement (`2>/dev/null || true`), et le patch n'était jamais copié dans `wine-tkg-userpatches/`. Fix : `:ro,z` sur TOUS les volumes montés.
 
 ## Conventions de commits
 
