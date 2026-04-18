@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
-IMAGE_NAME="gwine-beta-build"
+IMAGE_NAME="gwine-build"
 OUTPUT_DIR="/tmp/gwine-output"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
@@ -40,7 +40,7 @@ cd /build/wine-tkg-git/wine-tkg-git
 
 BUILD_DIR=$(ls -d non-makepkg-builds/wine-tkg* | head -n 1)
 VERSION=$(basename "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*//')
-DEST="gwine-proton-test-${VERSION:-unknown}"
+DEST="gwine-proton-${VERSION:-unknown}"
 
 cp -a "$BUILD_DIR" "/build/${DEST}"
 
@@ -55,7 +55,7 @@ cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstr
 for f in "/build/${DEST}/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
 for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
 
-mv "/build/${DEST}" "/output/gwine-proton-test-${TIMESTAMP}"
-ln -sfn "gwine-proton-test-${TIMESTAMP}" "/output/gwine-proton-test-latest"
-echo "=== Build done: /output/gwine-proton-test-${TIMESTAMP} ==="
+mv "/build/${DEST}" "/output/gwine-proton-${TIMESTAMP}"
+ln -sfn "gwine-proton-${TIMESTAMP}" "/output/gwine-proton-latest"
+echo "=== Build done: /output/gwine-proton-${TIMESTAMP} ==="
 CONTAINER_SCRIPT

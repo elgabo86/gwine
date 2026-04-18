@@ -9,36 +9,34 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 | Variant | Base | Container CI | winedmo | Description |
 |---------|------|-------------|---------|-------------|
 | gwine | Wine mainline + staging | artixlinux/artixlinux:latest | Non (upstream n'a pas le code) | Build Wine classique |
-| gwine-proton | Valve proton-experimental-bleeding-edge | artixlinux/artixlinux:latest | Non (pas de FFmpeg) | Build basé sur l'arbre Valve |
-| gwine-proton-beta | Valve proton-experimental-bleeding-edge | fedora:43 | Oui (FFmpeg shared bundle) | Build expérimental avec winedmo pour la lecture vidéo |
+| gwine-proton | Valve proton-experimental-bleeding-edge | fedora:43 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
 
 ## Fichiers importants
 
 - `.github/workflows/build-gwine.yml` — Workflow CI gwine + gwine-proton (`workflow_dispatch` uniquement)
-- `.github/workflows/build-gwine-beta.yml` — Workflow CI gwine-proton-beta (push sur `main` + `workflow_dispatch`)
 - `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + gst-libav)
-- `test-build.sh` — Script de build local via Podman (output dans `/tmp/gwine-output/`)
+- `test-build.sh` — Script de build local gwine-proton via Podman (output dans `/tmp/gwine-output/`)
+- `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
-  - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton-beta)
+  - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
 
 ## Build
 
 - gwine/gwine-proton : déclenchement manuel (`workflow_dispatch`)
-- gwine-proton-beta : déclenchement sur push `main` + `workflow_dispatch`
 - wine-tkg-git est cloné, configuré via sed, puis `non-makepkg-build.sh` est exécuté
 - Le dependency auto-resolver de wine-tkg est désactivé (`_nomakepkg_dependency_autoresolver="false"`) car les noms de packages sont obsolètes pour Fedora 43
 - Les releases sont des `.tar.xz` avec conservation des 3 dernières par variant
-- gwine-proton-beta releases sont marquées `prerelease: true`
 
 ## Build local (Podman)
 
-L'image de base `gwine-beta-build` contient les deps + FFmpeg + gst-libav (cachée après le 1er build).
+L'image de base `gwine-build` contient les deps + FFmpeg + gst-libav (cachée après le 1er build).
 
 ```bash
-bash test-build.sh
+bash test-build.sh        # gwine-proton
+bash test-build-gwine.sh  # gwine
 ```
 
-L'output va dans `/tmp/gwine-output/gwine-proton-test/`.
+L'output va dans `/tmp/gwine-output/gwine-proton-{timestamp}/` (ou `gwine-{timestamp}/`), avec un symlink `*-latest` vers la plus récente.
 
 **Notes techniques :**
 - `podman run -i` requis pour passer le script via heredoc stdin
@@ -56,10 +54,9 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Si winegstreamer ne trouve pas de plugins GStreamer → erreur `GStreamer doesn't support H.264 decoding`
 - **Solution** : bundler `gst-libav` (plugin GStreamer qui wrappe FFmpeg) compilé contre notre FFmpeg custom
 
-**Pourquoi seulement sur gwine-proton-beta :**
+**Pourquoi seulement sur gwine-proton :**
 - L'arbre Wine upstream (gwine) n'a pas le code winedmo
-- gwine-proton (Artix) aurait un glibc trop récent pour Fedora/uBlue → FFmpeg .so incompatibles
-- gwine-proton-beta utilise Fedora 43 → même glibc que le système cible (uBlue)
+- gwine-proton utilise Fedora 43 → même glibc que le système cible (uBlue)
 
 **FFmpeg est compilé en shared (.so)** avec les flags GE-Proton :
 - ~40 décodeurs (vc1, wmv1-3, h264, hevc, aac, mpeg4...)
@@ -129,15 +126,14 @@ Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 
 - CI workflow : étape "Build gst-libav for winegstreamer" + bundling dans Package + `dnf install -y meson` + `rpm -ivh`
 - test-build.sh : copie gst-libav + rpath dans l'output (chemin `lib64` corrigé pour 64-bit)
 - winegstreamer.so 32-bit : fix via les i686 transitive deps
-- **Runtime vérifié** : vidéos H.264 fonctionnent dans Donkey Kong Country avec gst-libav + FFmpeg bundlés
 
 ## Conventions de commits
 
 Format : `[variant] type: message`
 
-- variant : `gwine`, `gwine-proton`, `gwine-proton-beta`, ou `all`
+- variant : `gwine`, `gwine-proton`, ou `all`
 - type : `feat`, `fix`, `chore`, `ci`
-- Exemples : `[gwine-proton-beta] feat: add FFmpeg build for winedmo`, `[all] fix: correct rpath on winedmo.so`
+- Exemples : `[gwine-proton] feat: add FFmpeg build for winedmo`, `[all] fix: correct rpath on winedmo.so`
 
 ## Langue
 
