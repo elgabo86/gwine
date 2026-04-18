@@ -146,7 +146,7 @@ Le bug est côté **input** (push des données encodées dans le pipeline GStrea
 
 **Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. **En attente de validation runtime** — les 3 premiers builds ont échoué à cause du volume SELinux (voir ci-dessous), le patch n'a jamais été copié dans le conteneur. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
 
-**Portée** : **local uniquement** — test via Podman (`test-build.sh`). Le patch n'est **pas** appliqué sur les builds CI (GitHub Actions) pour le moment.
+**Portée** : gwine-proton (CI + local). Exclu de gwine (le topology_loader mfplat est un stub, pas de vidéo MF).
 
 **Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
 
