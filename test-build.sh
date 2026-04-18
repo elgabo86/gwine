@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 IMAGE_NAME="gwine-beta-build"
 OUTPUT_DIR="/tmp/gwine-output"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile" "${REPO_ROOT}"
 
@@ -54,6 +55,7 @@ cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstr
 for f in "/build/${DEST}/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
 for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
 
-mv "/build/${DEST}" "/output/gwine-proton-test"
-echo "=== Build done: /output/gwine-proton-test ==="
+mv "/build/${DEST}" "/output/gwine-proton-test-${TIMESTAMP}"
+ln -sfn "gwine-proton-test-${TIMESTAMP}" "/output/gwine-proton-test-latest"
+echo "=== Build done: /output/gwine-proton-test-${TIMESTAMP} ==="
 CONTAINER_SCRIPT
