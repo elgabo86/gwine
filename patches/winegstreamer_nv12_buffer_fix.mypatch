@@ -1,0 +1,19 @@
+diff --git a/dlls/winegstreamer/wg_transform.c b/dlls/winegstreamer/wg_transform.c
+index aa389cb..7cc980e 100644
+--- a/dlls/winegstreamer/wg_transform.c
++++ b/dlls/winegstreamer/wg_transform.c
+@@ -996,10 +996,11 @@ NTSTATUS wg_transform_push_data(void *args)
+         return STATUS_SUCCESS;
+     }
+ 
+-    if (!(buffer = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, wg_sample_data(sample), sample->max_size,
+-            0, sample->stride ? sample->max_size : sample->size, sample, wg_sample_free_notify)))
++    if (!(buffer = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, wg_sample_data(sample),
++            max((gsize)sample->max_size, (gsize)sample->size),
++            0, sample->size, sample, wg_sample_free_notify)))
+     {
+-        GST_ERROR("Failed to allocate input buffer");
++        GST_ERROR("Failed to allocate input buffer [NV12 fix applied]");
+         return STATUS_NO_MEMORY;
+     }
+     else

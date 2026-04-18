@@ -19,6 +19,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 - `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
   - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
+  - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine + gwine-proton, voir section dédiée)
 
 ## Build
 
@@ -126,6 +127,28 @@ Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 
 - CI workflow : étape "Build gst-libav for winegstreamer" + bundling dans Package + `dnf install -y meson` + `rpm -ivh`
 - test-build.sh : copie gst-libav + rpath dans l'output (chemin `lib64` corrigé pour 64-bit)
 - winegstreamer.so 32-bit : fix via les i686 transitive deps
+
+## winegstreamer NV12 buffer size mismatch — EN COURS
+
+**Symptôme** : vidéos H.264 (ex: Legend of Mana) affichent un écran noir, erreur en boucle :
+```
+videometa gstvideometa.c:424:default_map: plane 1, no memory at offset 2088960
+default video-frame.c:168:gst_video_frame_map_id: failed to map video frame plane 1
+```
+
+**Cause racine** : dans `dlls/winegstreamer/wg_transform.c`, fonction `wg_transform_push_data`, le GstBuffer de sortie est créé via `gst_buffer_new_wrapped_full` avec `maxsize=sample->max_size` et `size=sample->max_size` (quand `sample->stride != 0`). Pour du NV12 1920×1088 : `max_size=2 088 960` (plan Y seul) mais `sample->size=3 133 440` (Y+UV complet). Le `GstVideoMeta` ajouté ensuite décrit le plan UV à l'offset 2 088 960, qui est au-delà de la mémoire du buffer → `gst_buffer_find_memory` échoue.
+
+Le bug est côté **input** (push des données encodées dans le pipeline GStreamer), pas côté output. L'erreur se manifeste côté output car `videoconvert` essaie de mapper le plan UV du buffer et échoue.
+
+**Fix** (`winegstreamer_nv12_buffer_fix.mypatch`) :
+- `maxsize` → `max((gsize)sample->max_size, (gsize)sample->size)` — garantit maxsize >= size
+- `size` → toujours `sample->size` au lieu de `sample->stride ? sample->max_size : sample->size` — utilise la vraie taille des données
+
+**Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. **En attente de validation runtime** — les builds précédents avaient un patch avec du fuzz qui était silencieusement rejeté par `patch -Np1`. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
+
+**Portée** : **local uniquement** — test via Podman (`test-build.sh`). Le patch n'est **pas** appliqué sur les builds CI (GitHub Actions) pour le moment.
+
+**Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
 
 ## Conventions de commits
 

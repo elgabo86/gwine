@@ -11,6 +11,7 @@ podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile" "${REPO_ROOT}"
 mkdir -p "${OUTPUT_DIR}"
 
 podman run --rm -i \
+  -e TIMESTAMP="${TIMESTAMP}" \
   -v "${REPO_ROOT}/patches:/patches:ro" \
   -v "${OUTPUT_DIR}:/output:z" \
   "${IMAGE_NAME}" \

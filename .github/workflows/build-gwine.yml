@@ -56,7 +56,8 @@ jobs:
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
-            echo "Removed proton-specific patches for gwine build"
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
+            echo "Removed proton-specific and local-test patches for gwine build"
           fi
 
       - name: Start build
@@ -287,7 +288,8 @@ jobs:
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
-            echo "Copied custom patches (removed gwine-specific gamepad patch)"
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
+            echo "Copied custom patches (removed gwine-specific and local-test patches)"
           fi
 
       - name: Start build
