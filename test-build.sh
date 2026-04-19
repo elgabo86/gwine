@@ -28,6 +28,8 @@ sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customi
 sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
+sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
+sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
 sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/' wine-tkg-profiles/advanced-customization.cfg
 
 if [ -d /patches ]; then

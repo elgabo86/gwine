@@ -38,6 +38,7 @@ sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/adv
 sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
+sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
 
 if [ -d /patches ]; then
   cp /patches/*.mypatch wine-tkg-userpatches/ 2>/dev/null || true

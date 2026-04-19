@@ -48,6 +48,7 @@ jobs:
           sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/g' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
           sed -i 's/pacman -S\${_confirm_str} --needed/pacman -S\${_confirm_str} --needed --noconfirm/' wine-tkg-scripts/deps
 
       - name: Copy custom patches
@@ -281,6 +282,8 @@ jobs:
           sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
+          sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
+          sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
