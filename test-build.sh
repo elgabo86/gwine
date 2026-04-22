@@ -39,6 +39,8 @@ if [ -d /patches ]; then
   ls -la wine-tkg-userpatches/*.mypatch 2>/dev/null || echo "(no .mypatch files found after cp)"
 fi
 
+sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
+
 ( yes | ./non-makepkg-build.sh ) || true
 
 cd /build/wine-tkg-git/wine-tkg-git

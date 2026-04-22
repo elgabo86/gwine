@@ -4,7 +4,7 @@ RUN dnf upgrade -y && \
     dnf install -y \
   git make ccache gcc-c++ mingw32-gcc mingw32-gcc-c++ mingw32-cpp \
   mingw64-gcc mingw64-gcc-c++ mingw64-cpp \
-  wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers \
+  wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers ocl-icd-devel \
   libvkd3d-devel icoutils vulkan-loader-devel vulkan-headers \
   lcms2-devel mpg123-devel libva-devel fontforge gsm-devel \
   libjpeg-turbo-devel systemd-devel libv4l-devel pulseaudio-libs-devel \
@@ -44,7 +44,7 @@ RUN dnf upgrade -y && \
   orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
   pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
   libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
-  systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 && \
+  systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 && \
   mkdir -p /tmp/i686-rpms && \
   dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true; \
   if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then \
@@ -74,11 +74,11 @@ RUN cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/ && \
     for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done && \
     for f in /opt/ffmpeg32/lib/libav*.so.* /opt/ffmpeg32/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done
 
-ARG GST_LIBAV_VER=1.26.11
+ARG GST_VER=1.26.11
 
-RUN dnf install -y meson && \
-    curl -L "https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-${GST_LIBAV_VER}.tar.xz" | tar xJ -C /tmp && \
-    cd /tmp/gst-libav-${GST_LIBAV_VER} && \
+RUN dnf install -y meson git && \
+    git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gstreamer && \
+    cd /tmp/gstreamer/subprojects/gst-libav && \
     PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
     meson setup build64 \
       --prefix=/opt/gst-libav64 \
@@ -94,7 +94,7 @@ RUN dnf install -y meson && \
       --buildtype=release && \
     meson compile -C build32 -j$(nproc) && \
     meson install -C build32 && \
-    rm -rf /tmp/gst-libav-${GST_LIBAV_VER}
+    rm -rf /tmp/gstreamer
 
 RUN for f in /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true; done && \
     for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true; done

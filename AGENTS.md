@@ -19,7 +19,9 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 - `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
   - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
-  - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine + gwine-proton, voir section dédiée)
+  - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine-proton uniquement, exclu de gwine car topology_loader stub)
+  - `winedmo_ffmpeg8_compat.mypatch` — Remplace le BSF custom `pcm_byte_order_reverse` par de l'inversion inline dans `unix_demuxer.c` pour compat FFmpeg 7+/8+ (gwine-proton uniquement, exclu de gwine)
+  - `opencl_linux_fix.mypatch` — Ajoute `AC_CHECK_LIB(OpenCL,clGetPlatformInfo)` dans le cas `*)` de `configure.ac` pour que `OPENCL_LIBS="-lOpenCL"` soit set sur Linux (gwine-proton uniquement, exclu de gwine)
 
 ## Build
 
@@ -144,13 +146,21 @@ Le bug est côté **input** (push des données encodées dans le pipeline GStrea
 - `maxsize` → `max((gsize)sample->max_size, (gsize)sample->size)` — garantit maxsize >= size
 - `size` → toujours `sample->size` au lieu de `sample->stride ? sample->max_size : sample->size` — utilise la vraie taille des données
 
-**Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. **En attente de validation runtime** — les 3 premiers builds ont échoué à cause du volume SELinux (voir ci-dessous), le patch n'a jamais été copié dans le conteneur. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
+**Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. SELinux `:z` fix appliqué. **En attente de validation runtime**. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
 
 **Portée** : gwine-proton (CI + local). Exclu de gwine (le topology_loader mfplat est un stub, pas de vidéo MF).
 
 **Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
 
 **Note sur les volumes SELinux** : le volume `/patches` était monté avec `:ro` au lieu de `:ro,z`, ce qui causait un Permission denied silencieux. Le conteneur ne pouvait pas lire les patches, le `cp` échouait silencieusement (`2>/dev/null || true`), et le patch n'était jamais copié dans `wine-tkg-userpatches/`. Fix : `:ro,z` sur TOUS les volumes montés.
+
+## OpenCL — RÉSOLU (via patch)
+
+Wine 11 ne set `OPENCL_LIBS` que sur macOS (`-framework OpenCL`), jamais sur Linux. Résultat : `opencl.so` est compilé mais linké sans `-lOpenCL` → `undefined reference to clGetPlatformInfo`. Le patch `opencl_linux_fix.mypatch` ajoute `AC_CHECK_LIB(OpenCL, clGetPlatformInfo)` dans le cas `*)` du `case $host_os` de `configure.ac`, set `OPENCL_LIBS="-lOpenCL"` si trouvé. wine-tkg exécute `autoreconf -fiv` après les userpatches, donc le `configure` est régénéré automatiquement.
+
+- `ocl-icd-devel` + `ocl-icd-devel.i686` installés dans le container Fedora 43 (Containerfile + CI)
+- Ne PAS ajouter `--without-opencl` dans les configure args (OpenCL est requis par certains émulateurs/games)
+- Portée : gwine-proton uniquement (gwine n'a pas le problème de build)
 
 ## Conventions de commits
 

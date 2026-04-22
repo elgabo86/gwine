@@ -58,6 +58,8 @@ jobs:
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winedmo_ffmpeg8_compat.mypatch
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/opencl_linux_fix.mypatch
             echo "Removed proton-specific and local-test patches for gwine build"
           fi
 
@@ -136,7 +138,7 @@ jobs:
           dnf install -y \
             git make ccache gcc-c++ mingw32-gcc mingw32-gcc-c++ mingw32-cpp \
             mingw64-gcc mingw64-gcc-c++ mingw64-cpp \
-            wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers \
+            wayland-devel sdl2-compat-devel openal-soft-devel opencl-headers ocl-icd-devel \
             libvkd3d-devel icoutils vulkan-loader-devel vulkan-headers \
             lcms2-devel mpg123-devel libva-devel fontforge gsm-devel \
             libjpeg-turbo-devel systemd-devel libv4l-devel pulseaudio-libs-devel \
@@ -178,7 +180,7 @@ jobs:
             orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
             pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
             libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
-            systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686
+            systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686
 
           mkdir -p /tmp/i686-rpms
           dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true
@@ -241,10 +243,10 @@ jobs:
 
       - name: Build gst-libav for winegstreamer
         run: |
-          dnf install -y meson
-          GST_LIBAV_VER="1.26.11"
-          curl -L "https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-${GST_LIBAV_VER}.tar.xz" | tar xJ -C /tmp
-          cd "/tmp/gst-libav-${GST_LIBAV_VER}"
+          dnf install -y meson git
+          GST_VER="1.26.11"
+          git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gstreamer
+          cd /tmp/gstreamer/subprojects/gst-libav
 
           PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
           meson setup build64 \
@@ -262,7 +264,7 @@ jobs:
             --buildtype=release
           meson compile -C build32 -j$(nproc)
           meson install -C build32
-          rm -rf "/tmp/gst-libav-${GST_LIBAV_VER}"
+          rm -rf /tmp/gstreamer
 
           for f in /opt/gst-libav64/lib/gstreamer-1.0/libgst*.so; do
             patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true
@@ -284,6 +286,7 @@ jobs:
           sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
           sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
           sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
+          sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/' wine-tkg-profiles/advanced-customization.cfg
 
       - name: Copy custom patches
         working-directory: /home/runner/work/
@@ -297,6 +300,7 @@ jobs:
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
+          sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
           ( yes | ./non-makepkg-build.sh ) || true
 
       - name: Show prepare.log on failure

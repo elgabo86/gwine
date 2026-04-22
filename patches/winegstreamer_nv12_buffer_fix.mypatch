@@ -1,8 +1,8 @@
 diff --git a/dlls/winegstreamer/wg_transform.c b/dlls/winegstreamer/wg_transform.c
-index aa389cb..7cc980e 100644
+index 5e9d916..cf8c946 100644
 --- a/dlls/winegstreamer/wg_transform.c
 +++ b/dlls/winegstreamer/wg_transform.c
-@@ -996,10 +996,11 @@ NTSTATUS wg_transform_push_data(void *args)
+@@ -1032,10 +1032,11 @@ NTSTATUS wg_transform_push_data(void *args)
          return STATUS_SUCCESS;
      }
  

@@ -1,0 +1,19 @@
+diff --git a/configure.ac b/configure.ac
+index 723e629..91158f8 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1026,6 +1026,14 @@ case $host_os in
+ 
+   *)
+     AC_DEFINE(_GNU_SOURCE,1,[Define to 1 to enable GNU extensions on Linux])
++    if test "$ac_cv_header_CL_cl_h" = "yes"
++    then
++        AC_CHECK_LIB(OpenCL,clGetPlatformInfo,[:],[:])
++        if test "$ac_cv_lib_OpenCL_clGetPlatformInfo" = "yes"
++        then
++            AC_SUBST(OPENCL_LIBS,"-lOpenCL")
++        fi
++    fi
+     if test $HOST_ARCH = i386
+     then
+         DLLFLAGS="$DLLFLAGS -fno-PIC"

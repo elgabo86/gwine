@@ -11,7 +11,7 @@ podman build -t "${IMAGE_NAME}" -f "${REPO_ROOT}/Containerfile" "${REPO_ROOT}"
 mkdir -p "${OUTPUT_DIR}"
 
 podman run --rm -i \
-  -v "${REPO_ROOT}/patches:/patches:ro" \
+  -v "${REPO_ROOT}/patches:/patches:ro,z" \
   -v "${OUTPUT_DIR}:/output:z" \
   "${IMAGE_NAME}" \
   bash << 'CONTAINER_SCRIPT'
@@ -43,8 +43,13 @@ sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
 if [ -d /patches ]; then
   cp /patches/*.mypatch wine-tkg-userpatches/ 2>/dev/null || true
   rm -f wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
-  echo "Copied custom patches (removed proton-specific cuda patch)"
+  rm -f wine-tkg-userpatches/winedmo_ffmpeg8_compat.mypatch
+  rm -f wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
+  rm -f wine-tkg-userpatches/opencl_linux_fix.mypatch
+  echo "Copied custom patches (removed proton-specific patches)"
 fi
+
+sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
 
 ( yes | ./non-makepkg-build.sh ) || true
 
