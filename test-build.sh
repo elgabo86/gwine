@@ -74,6 +74,9 @@ cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstr
 for f in "/build/${DEST}/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
 for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
 
+cp -a /opt/icu68/win64/*.dll "/build/${DEST}/lib64/wine/x86_64-windows/" 2>/dev/null || true
+cp -a /opt/icu68/win32/*.dll "/build/${DEST}/lib/wine/i386-windows/" 2>/dev/null || true
+
 mv "/build/${DEST}" "/output/gwine-proton-${TIMESTAMP}"
 ln -sfn "gwine-proton-${TIMESTAMP}" "/output/gwine-proton-latest"
 echo "=== Build done: /output/gwine-proton-${TIMESTAMP} ==="

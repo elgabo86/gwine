@@ -162,6 +162,16 @@ Wine 11 ne set `OPENCL_LIBS` que sur macOS (`-framework OpenCL`), jamais sur Lin
 - Ne PAS ajouter `--without-opencl` dans les configure args (OpenCL est requis par certains émulateurs/games)
 - Portée : gwine-proton uniquement (gwine n'a pas le problème de build)
 
+## ICU 68 DLLs — RÉSOLU (via bundling)
+
+Wine 11 (arbre Valve) fournit `icu.dll` comme DLL de forwarding vers `icuuc68.dll` et `icuin68.dll` (ICU 68 versionné). Ces DLLs Windows natives ne sont pas incluses dans Wine → erreur `module not found for forward 'icuuc68.u_charsToUChars_68'`. Les jeux .NET sont particulièrement affectés.
+
+**Fix** : télécharger les ICU 68.2 Windows PE DLLs depuis unicode-org et les bundler dans le package :
+- 64-bit (`icuuc68.dll`, `icuin68.dll`, `icudt68.dll`) → `lib64/wine/x86_64-windows/`
+- 32-bit (`icuuc68.dll`, `icuin68.dll`, `icudt68.dll`) → `lib/wine/i386-windows/`
+- Source : `https://github.com/unicode-org/icu/releases/download/release-68_2/`
+- Portée : gwine-proton uniquement
+
 ## Conventions de commits
 
 Format : `[variant] type: message`
