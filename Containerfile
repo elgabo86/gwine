@@ -101,9 +101,9 @@ RUN for f in /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so; do patchelf --set-
 
 ARG ICU_VER=68_2
 RUN mkdir -p /opt/icu68/win64 /opt/icu68/win32 && \
-    curl -L "https://github.com/unicode-org/icu/releases/download/release-${ICU_VER}/icu4c-${ICU_VER}-Win64-MSVC2019.zip" -o /tmp/icu64.zip && \
+    curl -L "https://github.com/unicode-org/icu/releases/download/release-${ICU_VER/_/-}/icu4c-${ICU_VER}-Win64-MSVC2019.zip" -o /tmp/icu64.zip && \
     unzip -j /tmp/icu64.zip "bin64/icuuc68.dll" "bin64/icuin68.dll" "bin64/icudt68.dll" -d /opt/icu68/win64 && \
-    curl -L "https://github.com/unicode-org/icu/releases/download/release-${ICU_VER}/icu4c-${ICU_VER}-Win32-MSVC2019.zip" -o /tmp/icu32.zip && \
+    curl -L "https://github.com/unicode-org/icu/releases/download/release-${ICU_VER/_/-}/icu4c-${ICU_VER}-Win32-MSVC2019.zip" -o /tmp/icu32.zip && \
     unzip -j /tmp/icu32.zip "bin/icuuc68.dll" "bin/icuin68.dll" "bin/icudt68.dll" -d /opt/icu68/win32 && \
     rm -f /tmp/icu64.zip /tmp/icu32.zip
 
