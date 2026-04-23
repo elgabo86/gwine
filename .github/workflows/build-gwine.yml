@@ -335,7 +335,8 @@ jobs:
           curl -L "https://github.com/unicode-org/icu/releases/download/release-68-2/icu4c-68_2-Win32-MSVC2019.zip" -o /tmp/icu68/win32.zip && \
           unzip -j /tmp/icu68/win32.zip "bin/icuuc68.dll" "bin/icuin68.dll" "bin/icudt68.dll" -d /tmp/icu68/win32 && \
           cp -a /tmp/icu68/icuuc68.dll /tmp/icu68/icuin68.dll /tmp/icu68/icudt68.dll "gwine-proton-$VERSION/lib64/wine/x86_64-windows/" && \
-          cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "gwine-proton-$VERSION/lib/wine/i386-windows/" && \
+          ICU32_PE=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-windows "gwine-proton-$VERSION"/lib64/wine/i386-windows 2>/dev/null | head -n 1) && \
+          cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "${ICU32_PE}/" && \
           rm -rf /tmp/icu68
 
           echo "Bundled FFmpeg .so, GStreamer plugins, ICU 68 DLLs, and set rpath on winedmo.so"
