@@ -56,15 +56,10 @@ else
 fi
 echo "=== Build directory: $BUILD_DIR ==="
 
-UNIX64=$(ls -d "$BUILD_DIR"/lib/wine/x86_64-unix "$BUILD_DIR"/lib64/wine/x86_64-unix 2>/dev/null | head -n 1)
-UNIX32=$(ls -d "$BUILD_DIR"/lib/wine/i386-unix "$BUILD_DIR"/lib64/wine/i386-unix 2>/dev/null | head -n 1)
-PE64=$(ls -d "$BUILD_DIR"/lib/wine/x86_64-windows "$BUILD_DIR"/lib64/wine/x86_64-windows 2>/dev/null | head -n 1)
-PE32=$(ls -d "$BUILD_DIR"/lib/wine/i386-windows "$BUILD_DIR"/lib64/wine/i386-windows 2>/dev/null | head -n 1)
-
 echo "=== Checking if NV12 fix was applied ==="
-if strings "${UNIX64}/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
+if strings "$BUILD_DIR/lib/wine/x86_64-unix/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
   echo "=== NV12 fix CONFIRMED in 64-bit binary ==="
-elif strings "${UNIX32}/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
+elif strings "$BUILD_DIR/lib/wine/i386-unix/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
   echo "=== NV12 fix CONFIRMED in 32-bit binary ==="
 else
   echo "=== WARNING: NV12 fix NOT found in binary! ==="
@@ -76,6 +71,23 @@ VERSION=$(basename "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*//')
 DEST="gwine-proton-${VERSION:-unknown}"
 
 cp -a "$BUILD_DIR" "/build/${DEST}"
+
+UNIX64=""
+UNIX32=""
+PE64=""
+PE32=""
+for d in "/build/${DEST}"/lib/wine/x86_64-unix "/build/${DEST}"/lib64/wine/x86_64-unix; do
+  if [ -d "$d" ]; then UNIX64="$d"; break; fi
+done
+for d in "/build/${DEST}"/lib/wine/i386-unix "/build/${DEST}"/lib64/wine/i386-unix; do
+  if [ -d "$d" ]; then UNIX32="$d"; break; fi
+done
+for d in "/build/${DEST}"/lib/wine/x86_64-windows "/build/${DEST}"/lib64/wine/x86_64-windows; do
+  if [ -d "$d" ]; then PE64="$d"; break; fi
+done
+for d in "/build/${DEST}"/lib/wine/i386-windows "/build/${DEST}"/lib64/wine/i386-windows; do
+  if [ -d "$d" ]; then PE32="$d"; break; fi
+done
 
 cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
 cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true

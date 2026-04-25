@@ -357,10 +357,22 @@ jobs:
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "gwine-proton-$VERSION"
 
-          UNIX64=$(ls -d "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix 2>/dev/null | head -n 1)
-          UNIX32=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib64/wine/i386-unix 2>/dev/null | head -n 1)
-          PE64=$(ls -d "gwine-proton-$VERSION"/lib/wine/x86_64-windows "gwine-proton-$VERSION"/lib64/wine/x86_64-windows 2>/dev/null | head -n 1)
-          PE32=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-windows "gwine-proton-$VERSION"/lib64/wine/i386-windows 2>/dev/null | head -n 1)
+          UNIX64=""
+          UNIX32=""
+          PE64=""
+          PE32=""
+          for d in "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix; do
+            if [ -d "$d" ]; then UNIX64="$d"; break; fi
+          done
+          for d in "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib64/wine/i386-unix; do
+            if [ -d "$d" ]; then UNIX32="$d"; break; fi
+          done
+          for d in "gwine-proton-$VERSION"/lib/wine/x86_64-windows "gwine-proton-$VERSION"/lib64/wine/x86_64-windows; do
+            if [ -d "$d" ]; then PE64="$d"; break; fi
+          done
+          for d in "gwine-proton-$VERSION"/lib/wine/i386-windows "gwine-proton-$VERSION"/lib64/wine/i386-windows; do
+            if [ -d "$d" ]; then PE32="$d"; break; fi
+          done
 
           cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
           cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
