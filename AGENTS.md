@@ -83,16 +83,12 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` doit pointer vers ces dirs
 
 **FAudio** (XAudio reimplementation) :
-- Build depuis le source (commit `d6b3e877` — dernier avant suppression du support GStreamer, requis pour WMA playback via GStreamer)
-- cmake avec `-DGSTREAMER=ON` — link contre GStreamer système (déjà dispo via les deps)
-- 64-bit installé dans `/opt/faudio64/lib64/`
-- 32-bit installé dans `/opt/faudio32/lib/`
-- `.pc` copiés dans les dirs système + `ldconfig` pour que Wine configure trouve FAudio
-- `.so` bundlés dans le package Wine avec `$ORIGIN` rpath :
-  - 32-bit → `${UNIX32}/` (libFAudio.so*)
-  - 64-bit → `${UNIX64}/` (libFAudio.so*)
-- `--with-faudio` passé aux configure args 32+64 bit (via `_configure_userargs64/32`)
-- Portée : gwine-proton uniquement — évite d'installer `lib32-FAudio` sur le système
+- Wine 11 (arbre Valve) a FAudio **builtin dans les PE DLLs** (xaudio2_*.dll, xactengine*.dll, x3daudio*.dll) — pas de `.so` externe
+- Le builtin FAudio utilise `FAudio_INTERNAL_DecodeWMAMF` → Media Foundation → winedmo/FFmpeg pour le décodage WMA, mais cette chaîne ne fonctionne pas pour XAudio2
+- **Workaround** : installer `xact` + `xact64` via winetricks (DLLs natives Microsoft avec décodeur WMA intégré)
+- gwine (mainline) : FAudio est un `.so` séparé linkant contre GStreamer → WMA marche via gst-libav système → pas de workaround nécessaire
+- Le `.so` FAudio bundlé et `--with-faudio` ont été retirés : inutiles pour gwine-proton (FAudio est builtin)
+- Portée : gwine-proton uniquement
 
 ## Problèmes connus (Fedora 43 container)
 

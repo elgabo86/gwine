@@ -25,8 +25,8 @@ cd wine-tkg-git/wine-tkg-git
 sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
 sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
-sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
+sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
 sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
 sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
@@ -93,9 +93,6 @@ cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/
 cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
 patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
 patchelf --set-rpath '$ORIGIN' "${UNIX64}/winedmo.so" 2>/dev/null || true
-
-cp -a /opt/faudio32/lib/libFAudio.so* "${UNIX32}/" 2>/dev/null || true
-cp -a /opt/faudio64/lib64/libFAudio.so* "${UNIX64}/" 2>/dev/null || true
 
 GST32_DIR="/build/${DEST}/lib32/gstreamer-1.0"
 GST64_DIR="/build/${DEST}/lib64/gstreamer-1.0"
