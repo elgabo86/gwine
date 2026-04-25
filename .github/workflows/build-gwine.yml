@@ -56,9 +56,7 @@ jobs:
         run: |
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
-            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
-            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winedmo_ffmpeg8_compat.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/opencl_linux_fix.mypatch
             echo "Removed proton-specific and local-test patches for gwine build"
           fi
@@ -155,7 +153,7 @@ jobs:
             zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
             libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
             gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-            libunwind-devel vulkan-devel meson
+            libunwind-devel vulkan-devel meson cmake
 
           dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel
 
@@ -273,6 +271,47 @@ jobs:
             patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true
           done
 
+      - name: Build FAudio for XAudio2
+        run: |
+          git clone https://github.com/FNA-XNA/FAudio.git /tmp/FAudio
+          cd /tmp/FAudio
+          git checkout d6b3e87720691bddd421673e4a9ea47a690b8fab
+
+          mkdir -p build64 && cd build64
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/opt/faudio64 \
+            -DCMAKE_INSTALL_LIBDIR=lib64 \
+            -DCMAKE_INSTALL_INCLUDEDIR=include/FAudio \
+            -DGSTREAMER=ON
+          make -j$(nproc) && make install
+          cd /tmp/FAudio
+
+          mkdir -p build32 && cd build32
+          PKG_CONFIG_PATH="/usr/lib/pkgconfig" \
+          CC="gcc -m32" CXX="g++ -m32" \
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/opt/faudio32 \
+            -DCMAKE_INSTALL_LIBDIR=lib \
+            -DCMAKE_INSTALL_INCLUDEDIR=include/FAudio \
+            -DGSTREAMER=ON
+          make -j$(nproc) && make install
+          rm -rf /tmp/FAudio
+
+          cp /opt/faudio64/lib64/pkgconfig/*.pc /usr/lib64/pkgconfig/
+          cp /opt/faudio32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/
+          echo "/opt/faudio64/lib64" > /etc/ld.so.conf.d/faudio64.conf
+          echo "/opt/faudio32/lib" > /etc/ld.so.conf.d/faudio32.conf
+          ldconfig
+
+          for f in /opt/faudio64/lib64/libFAudio.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
+          for f in /opt/faudio32/lib/libFAudio.so.*; do
+            patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
+          done
+
       - name: Clone wine-tkg-git repo and configure
         working-directory: /home/runner/work/
         run: |
@@ -281,8 +320,8 @@ jobs:
           sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
           sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-          sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-          sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
+          sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
           sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
           sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
           sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
@@ -318,10 +357,18 @@ jobs:
           VERSION=$(echo "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*\(.*\)$/\1/')
           mv "$BUILD_DIR" "gwine-proton-$VERSION"
 
-          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "gwine-proton-$VERSION/lib/wine/i386-unix/" 2>/dev/null || true
-          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "gwine-proton-$VERSION/lib64/wine/x86_64-unix/" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "gwine-proton-$VERSION/lib/wine/i386-unix/winedmo.so" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "gwine-proton-$VERSION/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
+          UNIX64=$(ls -d "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix 2>/dev/null | head -n 1)
+          UNIX32=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib64/wine/i386-unix 2>/dev/null | head -n 1)
+          PE64=$(ls -d "gwine-proton-$VERSION"/lib/wine/x86_64-windows "gwine-proton-$VERSION"/lib64/wine/x86_64-windows 2>/dev/null | head -n 1)
+          PE32=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-windows "gwine-proton-$VERSION"/lib64/wine/i386-windows 2>/dev/null | head -n 1)
+
+          cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
+          cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
+          patchelf --set-rpath '$ORIGIN' "${UNIX64}/winedmo.so" 2>/dev/null || true
+
+          cp -a /opt/faudio32/lib/libFAudio.so* "${UNIX32}/" 2>/dev/null || true
+          cp -a /opt/faudio64/lib64/libFAudio.so* "${UNIX64}/" 2>/dev/null || true
 
           mkdir -p "gwine-proton-$VERSION/lib32/gstreamer-1.0" "gwine-proton-$VERSION/lib64/gstreamer-1.0"
           cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
@@ -334,12 +381,11 @@ jobs:
           unzip -j /tmp/icu68/win64.zip "bin64/icuuc68.dll" "bin64/icuin68.dll" "bin64/icudt68.dll" -d /tmp/icu68 && \
           curl -L "https://github.com/unicode-org/icu/releases/download/release-68-2/icu4c-68_2-Win32-MSVC2019.zip" -o /tmp/icu68/win32.zip && \
           unzip -j /tmp/icu68/win32.zip "bin/icuuc68.dll" "bin/icuin68.dll" "bin/icudt68.dll" -d /tmp/icu68/win32 && \
-          cp -a /tmp/icu68/icuuc68.dll /tmp/icu68/icuin68.dll /tmp/icu68/icudt68.dll "gwine-proton-$VERSION/lib64/wine/x86_64-windows/" && \
-          ICU32_PE=$(ls -d "gwine-proton-$VERSION"/lib/wine/i386-windows "gwine-proton-$VERSION"/lib64/wine/i386-windows 2>/dev/null | head -n 1) && \
-          cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "${ICU32_PE}/" && \
+          cp -a /tmp/icu68/icuuc68.dll /tmp/icu68/icuin68.dll /tmp/icu68/icudt68.dll "${PE64}/" && \
+          cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "${PE32}/" && \
           rm -rf /tmp/icu68
 
-          echo "Bundled FFmpeg .so, GStreamer plugins, ICU 68 DLLs, and set rpath on winedmo.so"
+          echo "Bundled FFmpeg, FAudio, GStreamer plugins, ICU 68 DLLs; set rpath on winedmo.so"
 
           tar cJvf "gwine-proton-$VERSION.tar.xz" "gwine-proton-$VERSION"
           mv "gwine-proton-$VERSION.tar.xz" "/tmp/gwine-proton-$VERSION.tar.xz"

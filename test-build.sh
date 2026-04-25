@@ -16,7 +16,7 @@ podman run --rm -i \
   -v "${OUTPUT_DIR}:/output:z" \
   "${IMAGE_NAME}" \
   bash << 'CONTAINER_SCRIPT'
-set -euo pipefail
+set -u
 
 cd /build
 git clone https://github.com/Frogging-Family/wine-tkg-git.git
@@ -25,8 +25,8 @@ cd wine-tkg-git/wine-tkg-git
 sed -i 's/_LOCAL_PRESET=""/_LOCAL_PRESET="valve-exp-bleeding"/g' customization.cfg
 sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
-sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg"/' wine-tkg-profiles/advanced-customization.cfg
+sed -i 's/^_configure_userargs64=""/_configure_userargs64="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
+sed -i 's/^_configure_userargs32=""/_configure_userargs32="--without-dbus --with-ffmpeg --with-faudio"/' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_nomakepkg_dependency_autoresolver="true"/_nomakepkg_dependency_autoresolver="false"/' customization.cfg
 sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
 sed -i 's/_build_mediaconv="false"/_build_mediaconv="true"/g' customization.cfg
@@ -45,12 +45,26 @@ sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32
 
 cd /build/wine-tkg-git/wine-tkg-git
 
-BUILD_DIR=$(ls -d non-makepkg-builds/wine-tkg* | head -n 1)
+shopt -s nullglob
+_builds=(non-makepkg-builds/wine-tkg*)
+shopt -u nullglob
+if [ ${#_builds[@]} -gt 0 ]; then
+  BUILD_DIR="${_builds[0]}"
+else
+  echo "ERROR: No build directory found!" >&2
+  exit 1
+fi
+echo "=== Build directory: $BUILD_DIR ==="
+
+UNIX64=$(ls -d "$BUILD_DIR"/lib/wine/x86_64-unix "$BUILD_DIR"/lib64/wine/x86_64-unix 2>/dev/null | head -n 1)
+UNIX32=$(ls -d "$BUILD_DIR"/lib/wine/i386-unix "$BUILD_DIR"/lib64/wine/i386-unix 2>/dev/null | head -n 1)
+PE64=$(ls -d "$BUILD_DIR"/lib/wine/x86_64-windows "$BUILD_DIR"/lib64/wine/x86_64-windows 2>/dev/null | head -n 1)
+PE32=$(ls -d "$BUILD_DIR"/lib/wine/i386-windows "$BUILD_DIR"/lib64/wine/i386-windows 2>/dev/null | head -n 1)
 
 echo "=== Checking if NV12 fix was applied ==="
-if strings "$BUILD_DIR/lib64/wine/x86_64-unix/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
+if strings "${UNIX64}/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
   echo "=== NV12 fix CONFIRMED in 64-bit binary ==="
-elif strings "$BUILD_DIR/lib/wine/i386-unix/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
+elif strings "${UNIX32}/winegstreamer.so" 2>/dev/null | grep -q "NV12 fix applied"; then
   echo "=== NV12 fix CONFIRMED in 32-bit binary ==="
 else
   echo "=== WARNING: NV12 fix NOT found in binary! ==="
@@ -63,20 +77,24 @@ DEST="gwine-proton-${VERSION:-unknown}"
 
 cp -a "$BUILD_DIR" "/build/${DEST}"
 
-cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "/build/${DEST}/lib/wine/i386-unix/" 2>/dev/null || true
-cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "/build/${DEST}/lib64/wine/x86_64-unix/" 2>/dev/null || true
-patchelf --set-rpath '$ORIGIN' "/build/${DEST}/lib/wine/i386-unix/winedmo.so" 2>/dev/null || true
-patchelf --set-rpath '$ORIGIN' "/build/${DEST}/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
+cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
+cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
+patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
+patchelf --set-rpath '$ORIGIN' "${UNIX64}/winedmo.so" 2>/dev/null || true
 
-mkdir -p "/build/${DEST}/lib32/gstreamer-1.0" "/build/${DEST}/lib64/gstreamer-1.0"
-cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "/build/${DEST}/lib32/gstreamer-1.0/" 2>/dev/null || true
-cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstreamer-1.0/" 2>/dev/null || true
-for f in "/build/${DEST}/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
-for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+cp -a /opt/faudio32/lib/libFAudio.so* "${UNIX32}/" 2>/dev/null || true
+cp -a /opt/faudio64/lib64/libFAudio.so* "${UNIX64}/" 2>/dev/null || true
 
-cp -a /opt/icu68/win64/*.dll "/build/${DEST}/lib64/wine/x86_64-windows/" 2>/dev/null || true
-UNIX32_PE=$(ls -d "/build/${DEST}"/lib/wine/i386-windows "/build/${DEST}"/lib64/wine/i386-windows 2>/dev/null | head -n 1)
-cp -a /opt/icu68/win32/*.dll "${UNIX32_PE}/" 2>/dev/null || true
+GST32_DIR="/build/${DEST}/lib32/gstreamer-1.0"
+GST64_DIR="/build/${DEST}/lib64/gstreamer-1.0"
+mkdir -p "${GST32_DIR}" "${GST64_DIR}"
+cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "${GST32_DIR}/" 2>/dev/null || true
+cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "${GST64_DIR}/" 2>/dev/null || true
+for f in "${GST32_DIR}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
+for f in "${GST64_DIR}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+
+cp -a /opt/icu68/win64/*.dll "${PE64}/" 2>/dev/null || true
+cp -a /opt/icu68/win32/*.dll "${PE32}/" 2>/dev/null || true
 
 mv "/build/${DEST}" "/output/gwine-proton-${TIMESTAMP}"
 ln -sfn "gwine-proton-${TIMESTAMP}" "/output/gwine-proton-latest"

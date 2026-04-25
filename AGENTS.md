@@ -14,13 +14,12 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 ## Fichiers importants
 
 - `.github/workflows/build-gwine.yml` — Workflow CI gwine + gwine-proton (`workflow_dispatch` uniquement)
-- `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + gst-libav)
+- `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + gst-libav + FAudio)
 - `test-build.sh` — Script de build local gwine-proton via Podman (output dans `/tmp/gwine-output/`)
 - `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
   - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
   - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine-proton uniquement, exclu de gwine car topology_loader stub)
-  - `winedmo_ffmpeg8_compat.mypatch` — Remplace le BSF custom `pcm_byte_order_reverse` par de l'inversion inline dans `unix_demuxer.c` pour compat FFmpeg 7+/8+ (gwine-proton uniquement, exclu de gwine)
   - `opencl_linux_fix.mypatch` — Ajoute `AC_CHECK_LIB(OpenCL,clGetPlatformInfo)` dans le cas `*)` de `configure.ac` pour que `OPENCL_LIBS="-lOpenCL"` soit set sur Linux (gwine-proton uniquement, exclu de gwine)
 
 ## Build
@@ -32,7 +31,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 
 ## Build local (Podman)
 
-L'image de base `gwine-build` contient les deps + FFmpeg + gst-libav (cachée après le 1er build).
+L'image de base `gwine-build` contient les deps + FFmpeg + gst-libav + FAudio (cachée après le 1er build).
 
 ```bash
 bash test-build.sh        # gwine-proton
@@ -82,6 +81,18 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
   - 32-bit → `lib32/gstreamer-1.0/` (rpath → `$ORIGIN/../../wine/i386-unix`)
   - 64-bit → `lib64/gstreamer-1.0/` (rpath → `$ORIGIN/../../wine/x86_64-unix`)
 - Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` doit pointer vers ces dirs
+
+**FAudio** (XAudio reimplementation) :
+- Build depuis le source (commit `d6b3e877` — dernier avant suppression du support GStreamer, requis pour WMA playback via GStreamer)
+- cmake avec `-DGSTREAMER=ON` — link contre GStreamer système (déjà dispo via les deps)
+- 64-bit installé dans `/opt/faudio64/lib64/`
+- 32-bit installé dans `/opt/faudio32/lib/`
+- `.pc` copiés dans les dirs système + `ldconfig` pour que Wine configure trouve FAudio
+- `.so` bundlés dans le package Wine avec `$ORIGIN` rpath :
+  - 32-bit → `${UNIX32}/` (libFAudio.so*)
+  - 64-bit → `${UNIX64}/` (libFAudio.so*)
+- `--with-faudio` passé aux configure args 32+64 bit (via `_configure_userargs64/32`)
+- Portée : gwine-proton uniquement — évite d'installer `lib32-FAudio` sur le système
 
 ## Problèmes connus (Fedora 43 container)
 
@@ -153,6 +164,16 @@ Le bug est côté **input** (push des données encodées dans le pipeline GStrea
 **Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
 
 **Note sur les volumes SELinux** : le volume `/patches` était monté avec `:ro` au lieu de `:ro,z`, ce qui causait un Permission denied silencieux. Le conteneur ne pouvait pas lire les patches, le `cp` échouait silencieusement (`2>/dev/null || true`), et le patch n'était jamais copié dans `wine-tkg-userpatches/`. Fix : `:ro,z` sur TOUS les volumes montés.
+
+## winedmo — BSF PCM byte order reverse
+
+wine-tkg (depuis commit cf068be) revert automatiquement le commit `063a29bc` (PCM big-endian BSF) pour les builds non-proton utilisant `non-makepkg-build.sh`. Ce revert supprime le BSF custom `ff_pcm_byte_order_reverse_bsf` qui utilise des APIs internes FFmpeg (`ff_bsf_get_packet`, `AVBSFInternal`) absentes de FFmpeg 7+/8+. Résultat : pas besoin de notre ancien patch `winedmo_ffmpeg8_compat.mypatch`, le build est compatible FFmpeg 8+ nativement. Le revert retire aussi le support big-endian PCM (acceptable pour le gaming).
+
+Le commit 879a479 de wine-tkg set `_lib32name="lib"` + `_lib64name="lib"` pour Valve wine 11.0 → notre sed hack `--libdir` sur `_configure_args32` devient un no-op (les deux valent `lib`).
+
+**Conséquence sur les paths du build** : avec `_lib32name="lib"` + `_lib64name="lib"`, le build 64-bit atterrit dans `lib/wine/x86_64-unix/` (pas `lib64/wine/x86_64-unix/`). Les scripts de packaging (`test-build.sh`, CI workflow) doivent détecter dynamiquement les chemins via `ls -d .../lib/wine/x86_64-unix .../lib64/wine/x86_64-unix 2>/dev/null | head -n 1` plutôt que hardcoder `lib64/`.
+
+**`set -euo pipefail` dans le CONTAINER_SCRIPT** : incompatible avec les patterns `ls | head` et `grep | tail` utilisés dans le script. `ls` retourne exit 2 si un path n'existe pas, `pipefail` le propage, et `set -e` tue le script. Fix : remplacé par `set -u` dans le CONTAINER_SCRIPT, et utilisé des globs bash (`nullglob`) ou des boucles `for` + tests `-d` au lieu de `ls | head`.
 
 ## OpenCL — RÉSOLU (via patch)
 

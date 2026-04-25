@@ -42,8 +42,6 @@ sed -i 's/_build_faudio="false"/_build_faudio="true"/g' customization.cfg
 
 if [ -d /patches ]; then
   cp /patches/*.mypatch wine-tkg-userpatches/ 2>/dev/null || true
-  rm -f wine-tkg-userpatches/winegstreamer_cuda_memory_fix.mypatch
-  rm -f wine-tkg-userpatches/winedmo_ffmpeg8_compat.mypatch
   rm -f wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
   rm -f wine-tkg-userpatches/opencl_linux_fix.mypatch
   echo "Copied custom patches (removed proton-specific patches)"

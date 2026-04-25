@@ -21,7 +21,7 @@ RUN dnf upgrade -y && \
   zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
   libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
   gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-  libunwind-devel vulkan-devel meson && \
+  libunwind-devel vulkan-devel meson cmake && \
   dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel && \
   dnf install -y \
   pkgconf.i686 gcc-c++.i686 glibc-devel.i686 libX11-devel.i686 \
@@ -98,6 +98,29 @@ RUN dnf install -y meson git && \
 
 RUN for f in /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true; done && \
     for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true; done
+
+ARG FAUDIO_COMMIT=d6b3e87720691bddd421673e4a9ea47a690b8fab
+
+RUN git clone https://github.com/FNA-XNA/FAudio.git /tmp/FAudio && \
+    cd /tmp/FAudio && git checkout d6b3e87720691bddd421673e4a9ea47a690b8fab && \
+    mkdir -p build64 && cd build64 && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/faudio64 \
+      -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_INCLUDEDIR=include/FAudio -DGSTREAMER=ON && \
+    make -j$(nproc) && make install && \
+    cd /tmp/FAudio && mkdir -p build32 && cd build32 && \
+    PKG_CONFIG_PATH="/usr/lib/pkgconfig" CC="gcc -m32" CXX="g++ -m32" \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/faudio32 \
+      -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/FAudio -DGSTREAMER=ON && \
+    make -j$(nproc) && make install && \
+    rm -rf /tmp/FAudio
+
+RUN cp /opt/faudio64/lib64/pkgconfig/*.pc /usr/lib64/pkgconfig/ && \
+    cp /opt/faudio32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/ && \
+    echo "/opt/faudio64/lib64" > /etc/ld.so.conf.d/faudio64.conf && \
+    echo "/opt/faudio32/lib" > /etc/ld.so.conf.d/faudio32.conf && \
+    ldconfig && \
+    for f in /opt/faudio64/lib64/libFAudio.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done && \
+    for f in /opt/faudio32/lib/libFAudio.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done
 
 ARG ICU_VER=68_2
 RUN mkdir -p /opt/icu68/win64 /opt/icu68/win32 && \
