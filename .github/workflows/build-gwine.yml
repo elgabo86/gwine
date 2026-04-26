@@ -335,8 +335,6 @@ jobs:
 
           cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
           cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
-          patchelf --set-rpath '$ORIGIN' "${UNIX64}/winedmo.so" 2>/dev/null || true
 
           mkdir -p "gwine-proton-$VERSION/lib32/gstreamer-1.0" "gwine-proton-$VERSION/lib64/gstreamer-1.0"
           cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
@@ -353,7 +351,7 @@ jobs:
           cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "${PE32}/" && \
           rm -rf /tmp/icu68
 
-          echo "Bundled FFmpeg, GStreamer plugins, ICU 68 DLLs; set rpath on winedmo.so"
+          echo "Bundled FFmpeg, GStreamer plugins, ICU 68 DLLs; FFmpeg .so rpath set (no rpath on winedmo.so)"
 
           tar cJvf "gwine-proton-$VERSION.tar.xz" "gwine-proton-$VERSION"
           mv "gwine-proton-$VERSION.tar.xz" "/tmp/gwine-proton-$VERSION.tar.xz"

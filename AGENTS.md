@@ -70,7 +70,14 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
   - 64-bit → `lib64/wine/x86_64-unix/` (libav*.so, libsw*.so)
 - `.pc` copiés dans les dirs système + `ldconfig` pour que Wine configure trouve FFmpeg
 - `--with-ffmpeg` passé aux configure args 32+64 bit
-- `patchelf --set-rpath '$ORIGIN'` appliqué sur winedmo.so et tous les FFmpeg .so
+- `patchelf --set-rpath '$ORIGIN'` appliqué sur les FFmpeg .so uniquement (PAS sur winedmo.so — voir note ci-dessous)
+
+**Pourquoi PAS de rpath `$ORIGIN` sur winedmo.so :**
+- winedmo.so link dynamiquement contre libav*.so.62. Avec `$ORIGIN` rpath, winedmo trouve les FFmpeg .so bundlés → winedmo charge → le topology loader MF l'utilise comme démuxeur
+- Problème : quand winedmo charge, le builtin FAudio (xaudio2_7) tente le décodage WMA via `FAudio_WMADEC_init()` → `CoCreateInstance(&CLSID_CWMADecMediaObject)` → wmadec via winegstreamer. La négociation de output type échoue → `FAudio_assert(!FAILED(hr))` → **crash** (abort ou null pointer deref)
+- Sans `$ORIGIN` rpath : winedmo.so ne trouve pas FFmpeg → échoue à charger → `winedmo_demuxer_check()` retourne une erreur → la media source bascule sur `GStreamerByteStreamHandler` (winegstreamer) pour le démultiplexage ET le décodage → vidéo et audio WMA fonctionnent (comme dans gwine-proton 10)
+- Les FFmpeg .so bundlés restent nécessaires pour gst-libav (rpath → `$ORIGIN/../../wine/x86_64-unix` etc.)
+- `--with-ffmpeg` reste dans les configure args : Wine compile winedmo avec le support FFmpeg, mais winedmo ne trouvera pas les .so au runtime → fallback GStreamer
 
 **gst-libav** (GStreamer FFmpeg plugin) :
 - Compilé depuis le source contre notre FFmpeg custom (version Fedora trop ancienne)
