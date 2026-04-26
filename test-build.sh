@@ -97,8 +97,16 @@ GST64_DIR="/build/${DEST}/lib64/gstreamer-1.0"
 mkdir -p "${GST32_DIR}" "${GST64_DIR}"
 cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "${GST32_DIR}/" 2>/dev/null || true
 cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "${GST64_DIR}/" 2>/dev/null || true
-for f in "${GST32_DIR}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
-for f in "${GST64_DIR}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+UNIX32_RPATH=""
+for d in "/build/${DEST}"/lib/wine/i386-unix "/build/${DEST}"/lib32/wine/i386-unix; do
+  if [ -d "$d" ]; then UNIX32_RPATH=$(echo "$d" | sed "s|/build/${DEST}/||"); break; fi
+done
+UNIX64_RPATH=""
+for d in "/build/${DEST}"/lib/wine/x86_64-unix "/build/${DEST}"/lib64/wine/x86_64-unix; do
+  if [ -d "$d" ]; then UNIX64_RPATH=$(echo "$d" | sed "s|/build/${DEST}/||"); break; fi
+done
+for f in "${GST32_DIR}/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
+for f in "${GST64_DIR}/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
 
 cp -a /opt/icu68/win64/*.dll "${PE64}/" 2>/dev/null || true
 cp -a /opt/icu68/win32/*.dll "${PE32}/" 2>/dev/null || true

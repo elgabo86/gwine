@@ -21,6 +21,8 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
   - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
   - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine-proton uniquement, exclu de gwine car topology_loader stub)
   - `opencl_linux_fix.mypatch` — Ajoute `AC_CHECK_LIB(OpenCL,clGetPlatformInfo)` dans le cas `*)` de `configure.ac` pour que `OPENCL_LIBS="-lOpenCL"` soit set sur Linux (gwine-proton uniquement, exclu de gwine)
+  - `wmadec_getcurrenttype.mypatch` — Implémente `transform_GetInputCurrentType` et `transform_GetOutputCurrentType` dans `wma_decoder.c` (stub E_NOTIMPL → convertit DMO_MEDIA_TYPE en IMFMediaType via MFCreateMediaTypeFromRepresentation). Le stub E_NOTIMPL causait un crash quand la DLL native xaudio2_7 appelle GetInputCurrentType sur le MFT wmadec (null pointer deref). Portée : gwine + gwine-proton
+  - `disable_mediaconv_fallback.mypatch` — Désactive le fallback `use_mediaconv` dans `wg_parser.c` : "Proton video converter" est toujours skippé par `autoplug_select_cb`, pas de retry avec mediaconv si le 1er essai échoue. Sans ce patch, `protonvideoconverter` substitue la vidéo par un blank quand il n'y a pas de cache fozdb. Portée : gwine-proton uniquement
 
 ## Build
 
@@ -85,9 +87,19 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - 64-bit installé dans `/opt/gst-libav64/lib/gstreamer-1.0/`
 - 32-bit installé dans `/opt/gst-libav32/lib/gstreamer-1.0/`
 - Bundlé dans le package Wine :
-  - 32-bit → `lib32/gstreamer-1.0/` (rpath → `$ORIGIN/../../wine/i386-unix`)
-  - 64-bit → `lib64/gstreamer-1.0/` (rpath → `$ORIGIN/../../wine/x86_64-unix`)
-- Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` doit pointer vers ces dirs
+  - 32-bit → `lib32/gstreamer-1.0/` (rpath dynamique vers `$ORIGIN/../../<lib>/wine/i386-unix`)
+  - 64-bit → `lib64/gstreamer-1.0/` (rpath dynamique vers `$ORIGIN/../../<lib64>/wine/x86_64-unix`)
+  - Le rpath est détecté automatiquement au packaging car `_lib64name` peut valoir `lib` ou `lib64` selon la version de wine-tkg
+- Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` doit inclure les dirs bundlés ET les dirs système (`/usr/lib64/gstreamer-1.0:/usr/lib/gstreamer-1.0`), sinon les plugins de base (videoconvert, audioconvert) ne sont pas trouvés et winegstreamer échoue
+
+**protonmediaconverter** (désactivé via patch) :
+- GStreamer elements (`protonvideoconverter`, `protonaudioconverter`, `protonaudioconverterbin`, `protondemuxer`) dans `dlls/winegstreamer/media-converter/`
+- Conçus pour Steam : interceptent les flux média, hashent les données, substituent avec des versions transcodées depuis un cache fozdb (Fossilize). Sans cache → substituent par des fichiers blank → vidéo coupée
+- `wg_parser.c` a un mécanisme de fallback : 1er essai sans mediaconv → si échec (missing-plugin, state change failure) → retry avec mediaconv
+- Le patch `disable_mediaconv_fallback.mypatch` désactive ce fallback : "Proton video converter" est toujours skippé, pas de retry avec `use_mediaconv=true`
+- Conséquence : si le 1er essai (decodebin normal) échoue, la vidéo ne joue pas au lieu d'être substituée par un blank
+- Les variables MEDIACONV_* et STEAM_COMPAT_TRANSCODED_MEDIA_PATH ne sont PAS settées dans le launcher — les éléments protonmediaconverter ne peuvent pas fonctionner sans
+- Portée : gwine-proton uniquement
 
 **FAudio** (XAudio reimplementation) :
 - Wine 11 (arbre Valve) a FAudio **builtin dans les PE DLLs** (xaudio2_*.dll, xactengine*.dll, x3daudio*.dll) — pas de `.so` externe

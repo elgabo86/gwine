@@ -339,8 +339,17 @@ jobs:
           mkdir -p "gwine-proton-$VERSION/lib32/gstreamer-1.0" "gwine-proton-$VERSION/lib64/gstreamer-1.0"
           cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
           cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
-          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
-          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+
+          UNIX32_RPATH=""
+          for d in "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib32/wine/i386-unix; do
+            if [ -d "$d" ]; then UNIX32_RPATH="${d#gwine-proton-$VERSION/}"; break; fi
+          done
+          UNIX64_RPATH=""
+          for d in "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix; do
+            if [ -d "$d" ]; then UNIX64_RPATH="${d#gwine-proton-$VERSION/}"; break; fi
+          done
+          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
 
           mkdir -p /tmp/icu68 && \
           curl -L "https://github.com/unicode-org/icu/releases/download/release-68-2/icu4c-68_2-Win64-MSVC2019.zip" -o /tmp/icu68/win64.zip && \

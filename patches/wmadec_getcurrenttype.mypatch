@@ -1,0 +1,53 @@
+diff --git a/dlls/winegstreamer/wma_decoder.c b/dlls/winegstreamer/wma_decoder.c
+index 584a4ee..4b0a606 100644
+--- a/dlls/winegstreamer/wma_decoder.c
++++ b/dlls/winegstreamer/wma_decoder.c
+@@ -470,14 +470,44 @@ failed:
+ 
+ static HRESULT WINAPI transform_GetInputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
+ {
+-    FIXME("iface %p, id %lu, type %p stub!\n", iface, id, type);
+-    return E_NOTIMPL;
++    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
++    IMFMediaType *media_type;
++    HRESULT hr;
++
++    TRACE("iface %p, id %lu, type %p.\n", iface, id, type);
++
++    if (IsEqualGUID(&decoder->input_type.majortype, &GUID_NULL))
++        return MF_E_TRANSFORM_TYPE_NOT_SET;
++    if (!type)
++        return E_POINTER;
++
++    if (FAILED(hr = MFCreateMediaTypeFromRepresentation(AM_MEDIA_TYPE_REPRESENTATION,
++            &decoder->input_type, &media_type)))
++        return hr;
++
++    *type = media_type;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI transform_GetOutputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
+ {
+-    FIXME("iface %p, id %lu, type %p stub!\n", iface, id, type);
+-    return E_NOTIMPL;
++    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
++    IMFMediaType *media_type;
++    HRESULT hr;
++
++    TRACE("iface %p, id %lu, type %p.\n", iface, id, type);
++
++    if (IsEqualGUID(&decoder->output_type.majortype, &GUID_NULL))
++        return MF_E_TRANSFORM_TYPE_NOT_SET;
++    if (!type)
++        return E_POINTER;
++
++    if (FAILED(hr = MFCreateMediaTypeFromRepresentation(AM_MEDIA_TYPE_REPRESENTATION,
++            &decoder->output_type, &media_type)))
++        return hr;
++
++    *type = media_type;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI transform_GetInputStatus(IMFTransform *iface, DWORD id, DWORD *flags)
