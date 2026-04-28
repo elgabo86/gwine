@@ -21,7 +21,7 @@ RUN dnf upgrade -y && \
   zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
   libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
   gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-  libunwind-devel vulkan-devel meson && \
+  libunwind-devel vulkan-devel meson libatomic && \
   dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel && \
   dnf install -y \
   pkgconf.i686 gcc-c++.i686 glibc-devel.i686 libX11-devel.i686 \
@@ -44,7 +44,10 @@ RUN dnf upgrade -y && \
   orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
   pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
   libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
-  systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 && \
+  systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 libatomic.i686 \
+  libXdamage-devel.i686 libXtst-devel.i686 nettle-devel.i686 \
+  libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686 && \
+  ln -sf /usr/lib/gcc/x86_64-redhat-linux/15/32/libatomic.so /usr/lib/libatomic.so && \
   mkdir -p /tmp/i686-rpms && \
   dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true; \
   if ls /tmp/i686-rpms/*.rpm 1>/dev/null 2>&1; then \
@@ -74,30 +77,56 @@ RUN cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/ && \
     for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done && \
     for f in /opt/ffmpeg32/lib/libav*.so.* /opt/ffmpeg32/lib/libsw*.so.*; do patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done
 
-ARG GST_VER=1.26.11
+ARG GST_VER=1.28.2
 
-RUN dnf install -y meson git && \
-    git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gstreamer && \
-    cd /tmp/gstreamer/subprojects/gst-libav && \
-    PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
-    meson setup build64 \
-      --prefix=/opt/gst-libav64 \
-      --buildtype=release && \
-    meson compile -C build64 -j$(nproc) && \
-    meson install -C build64 && \
-    rm -rf build64 && \
+RUN git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gstreamer && \
+    cd /tmp/gstreamer && \
+    sed -i "s/have_sse41 = cc.has_argument(sse41_args) and host_machine.cpu_family() == 'x86_64'/have_sse41 = false/g" subprojects/gst-plugins-base/meson.build && \
+    rm -f subprojects/openh264.wrap subprojects/vpx.wrap subprojects/libvmaf.wrap subprojects/glib.wrap && \
+    mv /usr/lib64/glib-2.0/include/glibconfig.h /usr/lib64/glib-2.0/include/glibconfig.h.x64 && \
+    mv /usr/lib64/pkgconfig /usr/lib64/pkgconfig.x64 && \
     PKG_CONFIG_PATH="/opt/ffmpeg32/lib/pkgconfig:/usr/lib/pkgconfig" \
-    CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib" \
+    CFLAGS="-m32 -msse" CXXFLAGS="-m32 -msse" LDFLAGS="-m32 -L/usr/lib" \
     meson setup build32 \
-      --prefix=/opt/gst-libav32 \
-      --libdir=/opt/gst-libav32/lib \
-      --buildtype=release && \
+      --prefix=/opt/gst32 \
+      --libdir=/opt/gst32/lib \
+      --buildtype=release \
+      -Dugly=enabled \
+      -Dwebrtc=disabled \
+      -Dorc:orc-target=sse,mmx,avx \
+      -Dwerror=false \
+      -Dgstreamer:ptp-helper=disabled \
+      -Dgst-plugins-base:pango=disabled \
+      -Dgst-plugins-base:gl=disabled \
+      -Dgst-plugins-good:gtk3=disabled \
+      -Dgst-plugins-good:cairo=disabled \
+      -Dgst-plugins-good:gdk-pixbuf=disabled \
+      -Dgst-plugins-good:adaptivedemux2=disabled \
+      -Dgst-plugins-bad:dtls=disabled \
+      -Dtests=disabled \
+      -Dexamples=disabled && \
     meson compile -C build32 -j$(nproc) && \
     meson install -C build32 && \
-    rm -rf /tmp/gstreamer
-
-RUN for f in /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true; done && \
-    for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true; done
+    mv /usr/lib64/pkgconfig.x64 /usr/lib64/pkgconfig && \
+    mv /usr/lib64/glib-2.0/include/glibconfig.h.x64 /usr/lib64/glib-2.0/include/glibconfig.h && \
+    rm -rf build32 && \
+    PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
+    meson setup build64 \
+      --prefix=/opt/gst64 \
+      --libdir=/opt/gst64/lib64 \
+      --buildtype=release \
+      -Dugly=enabled \
+      -Dwebrtc=disabled \
+      -Dorc:orc-target=sse,mmx,avx \
+      -Dwerror=false && \
+    meson compile -C build64 -j$(nproc) && \
+    meson install -C build64 && \
+    rm -rf /tmp/gstreamer && \
+    cp /opt/gst64/lib64/pkgconfig/gstreamer*.pc /usr/lib64/pkgconfig/ && \
+    cp /opt/gst32/lib/pkgconfig/gstreamer*.pc /usr/lib/pkgconfig/ && \
+    echo "/opt/gst64/lib64" > /etc/ld.so.conf.d/gst64.conf && \
+    echo "/opt/gst32/lib" > /etc/ld.so.conf.d/gst32.conf && \
+    ldconfig
 
 ARG ICU_VER=68_2
 RUN mkdir -p /opt/icu68/win64 /opt/icu68/win32 && \

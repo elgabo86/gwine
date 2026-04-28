@@ -153,7 +153,7 @@ jobs:
             zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
             libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
             gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-            libunwind-devel vulkan-devel meson
+            libunwind-devel vulkan-devel meson libatomic
 
           dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel
 
@@ -178,7 +178,9 @@ jobs:
             orc-devel.i686 sysprof-capture-devel.i686 libffi-devel.i686 \
             pcre2-devel.i686 libgudev-devel.i686 mesa-libgbm-devel.i686 \
             libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
-            systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686
+            systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 libatomic.i686 \
+            libXdamage-devel.i686 libXtst-devel.i686 nettle-devel.i686 \
+            libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686
 
           mkdir -p /tmp/i686-rpms
           dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true
@@ -227,9 +229,13 @@ jobs:
 
           cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/
           cp /opt/ffmpeg32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/
+          cp /opt/gst64/lib64/pkgconfig/gstreamer*.pc /usr/lib64/pkgconfig/
+          cp /opt/gst32/lib/pkgconfig/gstreamer*.pc /usr/lib/pkgconfig/
 
           echo "/opt/ffmpeg64/lib" > /etc/ld.so.conf.d/ffmpeg64.conf
           echo "/opt/ffmpeg32/lib" > /etc/ld.so.conf.d/ffmpeg32.conf
+          echo "/opt/gst64/lib64" > /etc/ld.so.conf.d/gst64.conf
+          echo "/opt/gst32/lib" > /etc/ld.so.conf.d/gst32.conf
           ldconfig
 
           for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do
@@ -239,37 +245,57 @@ jobs:
             patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true
           done
 
-      - name: Build gst-libav for winegstreamer
+      - name: Build GStreamer for winegstreamer
         run: |
-          dnf install -y meson git
-          GST_VER="1.26.11"
+          GST_VER="1.28.2"
           git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gstreamer
-          cd /tmp/gstreamer/subprojects/gst-libav
+          cd /tmp/gstreamer
+
+          sed -i "s/have_sse41 = cc.has_argument(sse41_args) and host_machine.cpu_family() == 'x86_64'/have_sse41 = false/g" subprojects/gst-plugins-base/meson.build
+          rm -f subprojects/openh264.wrap subprojects/vpx.wrap subprojects/libvmaf.wrap subprojects/glib.wrap
+
+          mv /usr/lib64/glib-2.0/include/glibconfig.h /usr/lib64/glib-2.0/include/glibconfig.h.x64
+          mv /usr/lib64/pkgconfig /usr/lib64/pkgconfig.x64
+
+          PKG_CONFIG_PATH="/opt/ffmpeg32/lib/pkgconfig:/usr/lib/pkgconfig" \
+          CFLAGS="-m32 -msse" CXXFLAGS="-m32 -msse" LDFLAGS="-m32 -L/usr/lib" \
+          meson setup build32 \
+            --prefix=/opt/gst32 \
+            --libdir=/opt/gst32/lib \
+            --buildtype=release \
+            -Dugly=enabled \
+            -Dwebrtc=disabled \
+            -Dorc:orc-target=sse,mmx,avx \
+            -Dwerror=false \
+            -Dgstreamer:ptp-helper=disabled \
+            -Dgst-plugins-base:pango=disabled \
+            -Dgst-plugins-base:gl=disabled \
+            -Dgst-plugins-good:gtk3=disabled \
+            -Dgst-plugins-good:cairo=disabled \
+            -Dgst-plugins-good:gdk-pixbuf=disabled \
+            -Dgst-plugins-good:adaptivedemux2=disabled \
+            -Dgst-plugins-bad:dtls=disabled \
+            -Dtests=disabled \
+            -Dexamples=disabled
+          meson compile -C build32 -j$(nproc)
+          meson install -C build32
+
+          mv /usr/lib64/pkgconfig.x64 /usr/lib64/pkgconfig
+          mv /usr/lib64/glib-2.0/include/glibconfig.h.x64 /usr/lib64/glib-2.0/include/glibconfig.h
+          rm -rf build32
 
           PKG_CONFIG_PATH="/opt/ffmpeg64/lib/pkgconfig:/usr/lib64/pkgconfig" \
           meson setup build64 \
-            --prefix=/opt/gst-libav64 \
-            --buildtype=release
+            --prefix=/opt/gst64 \
+            --libdir=/opt/gst64/lib64 \
+            --buildtype=release \
+            -Dugly=enabled \
+            -Dwebrtc=disabled \
+            -Dorc:orc-target=sse,mmx,avx \
+            -Dwerror=false
           meson compile -C build64 -j$(nproc)
           meson install -C build64
-          rm -rf build64
-
-          PKG_CONFIG_PATH="/opt/ffmpeg32/lib/pkgconfig:/usr/lib/pkgconfig" \
-          CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib" \
-          meson setup build32 \
-            --prefix=/opt/gst-libav32 \
-            --libdir=/opt/gst-libav32/lib \
-            --buildtype=release
-          meson compile -C build32 -j$(nproc)
-          meson install -C build32
           rm -rf /tmp/gstreamer
-
-          for f in /opt/gst-libav64/lib/gstreamer-1.0/libgst*.so; do
-            patchelf --set-rpath '/opt/ffmpeg64/lib' "$f" 2>/dev/null || true
-          done
-          for f in /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so; do
-            patchelf --set-rpath '/opt/ffmpeg32/lib' "$f" 2>/dev/null || true
-          done
 
       - name: Clone wine-tkg-git repo and configure
         working-directory: /home/runner/work/
@@ -337,8 +363,12 @@ jobs:
           cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
 
           mkdir -p "gwine-proton-$VERSION/lib32/gstreamer-1.0" "gwine-proton-$VERSION/lib64/gstreamer-1.0"
-          cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
-          cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
+          mkdir -p "gwine-proton-$VERSION/lib32/gst-libs" "gwine-proton-$VERSION/lib64/gst-libs" "gwine-proton-$VERSION/lib/gst-libs"
+          cp -a /opt/gst32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
+          cp -a /opt/gst64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
+          cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+          cp -a /opt/gst64/lib64/libgst*-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
+          cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
 
           UNIX32_RPATH=""
           for d in "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib32/wine/i386-unix; do
@@ -348,8 +378,11 @@ jobs:
           for d in "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix; do
             if [ -d "$d" ]; then UNIX64_RPATH="${d#gwine-proton-$VERSION/}"; break; fi
           done
-          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
-          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
+
+          for f in "${UNIX64}/"winegstreamer.so; do patchelf --set-rpath "\$ORIGIN:\$ORIGIN/../../lib64/gst-libs" "$f" 2>/dev/null || true; done
+          for f in "${UNIX32}/"winegstreamer.so; do patchelf --set-rpath "\$ORIGIN:\$ORIGIN/../../lib32/gst-libs" "$f" 2>/dev/null || true; done
 
           mkdir -p /tmp/icu68 && \
           curl -L "https://github.com/unicode-org/icu/releases/download/release-68-2/icu4c-68_2-Win64-MSVC2019.zip" -o /tmp/icu68/win64.zip && \
@@ -360,7 +393,7 @@ jobs:
           cp -a /tmp/icu68/win32/icuuc68.dll /tmp/icu68/win32/icuin68.dll /tmp/icu68/win32/icudt68.dll "${PE32}/" && \
           rm -rf /tmp/icu68
 
-          echo "Bundled FFmpeg, GStreamer plugins, ICU 68 DLLs; FFmpeg .so rpath set (no rpath on winedmo.so)"
+          echo "Bundled FFmpeg, GStreamer plugins+libs, ICU 68 DLLs; FFmpeg .so rpath set (no rpath on winedmo.so)"
 
           tar cJvf "gwine-proton-$VERSION.tar.xz" "gwine-proton-$VERSION"
           mv "gwine-proton-$VERSION.tar.xz" "/tmp/gwine-proton-$VERSION.tar.xz"

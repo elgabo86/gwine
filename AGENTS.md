@@ -14,7 +14,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 ## Fichiers importants
 
 - `.github/workflows/build-gwine.yml` — Workflow CI gwine + gwine-proton (`workflow_dispatch` uniquement)
-- `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + gst-libav + FAudio)
+- `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + GStreamer 32+64-bit)
 - `test-build.sh` — Script de build local gwine-proton via Podman (output dans `/tmp/gwine-output/`)
 - `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
@@ -33,11 +33,12 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 
 ## Build local (Podman)
 
-L'image de base `gwine-build` contient les deps + FFmpeg + gst-libav + FAudio (cachée après le 1er build).
+L'image de base `gwine-build` contient les deps + FFmpeg + GStreamer (cachée après le 1er build).
 
 ```bash
-bash test-build.sh        # gwine-proton
-bash test-build-gwine.sh  # gwine
+bash test-build.sh                # gwine-proton
+bash test-build.sh --no-cache     # gwine-proton (rebuild image sans cache)
+bash test-build-gwine.sh          # gwine
 ```
 
 L'output va dans `/tmp/gwine-output/gwine-proton-{timestamp}/` (ou `gwine-{timestamp}/`), avec un symlink `*-latest` vers la plus récente.
@@ -81,16 +82,21 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Les FFmpeg .so bundlés restent nécessaires pour gst-libav (rpath → `$ORIGIN/../../wine/x86_64-unix` etc.)
 - `--with-ffmpeg` reste dans les configure args : Wine compile winedmo avec le support FFmpeg, mais winedmo ne trouvera pas les .so au runtime → fallback GStreamer
 
-**gst-libav** (GStreamer FFmpeg plugin) :
-- Compilé depuis le source contre notre FFmpeg custom (version Fedora trop ancienne)
-- Version 1.26.11 (match la version GStreamer du système)
-- 64-bit installé dans `/opt/gst-libav64/lib/gstreamer-1.0/`
-- 32-bit installé dans `/opt/gst-libav32/lib/gstreamer-1.0/`
+**GStreamer monorepo** (gst-libav + tous plugins + libs) :
+- Compilé depuis le source GStreamer monorepo (version 1.28.2, même version que les headers système Fedora 44)
+- **Important** : Wine compile winegstreamer.so contre les **headers système** (`gstreamer1-devel`, `gstreamer1-plugins-base-devel`). Si ces headers sont absents, Wine configure désactive winegstreamer → E_OUTOFMEMORY sur tous les filtres quartz au runtime. Les libs et plugins bundlés remplacent les versions système au runtime via RPATH.
+- Build 32-bit d'abord, puis 64-bit (glibconfig.h sauvegardé/restauré entre les deux)
+- Plugins compilés : base, good, bad, ugly, libav (wrappe notre FFmpeg custom)
+- 64-bit installé dans `/opt/gst64/`, 32-bit dans `/opt/gst32/`
+- `.pc` copiés dans les dirs système + `ldconfig` pour que Wine configure trouve GStreamer
 - Bundlé dans le package Wine :
-  - 32-bit → `lib32/gstreamer-1.0/` (rpath dynamique vers `$ORIGIN/../../<lib>/wine/i386-unix`)
-  - 64-bit → `lib64/gstreamer-1.0/` (rpath dynamique vers `$ORIGIN/../../<lib64>/wine/x86_64-unix`)
-  - Le rpath est détecté automatiquement au packaging car `_lib64name` peut valoir `lib` ou `lib64` selon la version de wine-tkg
-- Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` doit inclure les dirs bundlés ET les dirs système (`/usr/lib64/gstreamer-1.0:/usr/lib/gstreamer-1.0`), sinon les plugins de base (videoconvert, audioconvert) ne sont pas trouvés et winegstreamer échoue
+  - Plugins 32-bit → `lib32/gstreamer-1.0/` (rpath `$ORIGIN/../gst-libs:$ORIGIN/../../<lib>/wine/i386-unix`)
+  - Plugins 64-bit → `lib64/gstreamer-1.0/` (rpath `$ORIGIN/../gst-libs:$ORIGIN/../../<lib64>/wine/x86_64-unix`)
+  - Libs 32-bit → `lib32/gst-libs/` + `lib/gst-libs/` (pour `$LIB` dans LD_PRELOAD)
+  - Libs 64-bit → `lib64/gst-libs/`
+  - gst-plugin-scanner → `lib32/libexec/gstreamer-1.0/` + `lib64/libexec/gstreamer-1.0/`
+  - winegstreamer.so → rpatch `$ORIGIN:$ORIGIN/../../lib64/gst-libs` (64-bit) / `$ORIGIN/../../lib32/gst-libs` (32-bit)
+- Au runtime, `GST_PLUGIN_SYSTEM_PATH_1_0` ne liste que les dirs bundlés (pas de dirs système), les plugins de base (videoconvert, audioconvert, etc.) sont bundlés
 
 **protonmediaconverter** (désactivé via patch) :
 - GStreamer elements (`protonvideoconverter`, `protonaudioconverter`, `protonaudioconverterbin`, `protondemuxer`) dans `dlls/winegstreamer/media-converter/`
@@ -140,21 +146,21 @@ Packages concernés : `glib2-devel.i686`, `gstreamer1-devel.i686`, `gstreamer1-p
 - **systemd-standalone-tmpfiles** : présent dans le container de base, conflit avec le paquet systemd. Ne pas tenter d'installer systemd avec `--allowerasing`.
 - **Toolchain 32-bit** : les packages `glibc-devel.i686`, `libgcc.i686`, `libstdc++-devel.i686` doivent être installés AVANT le build FFmpeg 32-bit. Les `.pc` et `ldconfig` doivent être configurés avant le configure Wine.
 - **`non-makepkg-build.sh` appelle `exit`** : tue le shell parent. Workaround : subshell `( yes | ./non-makepkg-build.sh ) || true`.
-- **`meson` disparaît après les installs i686** : en réalité, `meson` restait installé. Le vrai problème était `rpm -Uvh` (upgrade) qui remplaçait les packages x86_64 par i686, supprimant les `.pc` x86_64 de `/usr/lib64/pkgconfig/`. Fix : `rpm -ivh` (install, pas upgrade). Un `dnf install -y meson` de sécurité est aussi ajouté avant le build gst-libav.
+- **`meson` disparaît après les installs i686** : en réalité, `meson` restait installé. Le vrai problème était `rpm -Uvh` (upgrade) qui remplaçait les packages x86_64 par i686, supprimant les `.pc` x86_64 de `/usr/lib64/pkgconfig/`. Fix : `rpm -ivh` (install, pas upgrade).
 
 ### winegstreamer.so 32-bit manquant — CAUSE RACINE ET FIX
 
 Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 6544) : `PKG_CONFIG_LIBDIR=${PKG_CONFIG_LIBDIR:-/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib32/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig}`. Cela **remplace** le chemin de recherche par défaut (qui inclut `/usr/lib64/pkgconfig/`), donc les dépendances transitives (orc, sysprof, libffi, pcre2, gudev, gbm, xcb, elfutils, xau, libudev, libzstd, libcap) ne sont pas trouvées car leurs `.pc` sont seulement dans `/usr/lib64/pkgconfig/`. Résultat : `GSTREAMER_CFLAGS` vide → `gst/gst.h` pas trouvé → winegstreamer désactivé.
 
 **Fix** : installer tous les packages i686 des dépendances transitives pour que leurs `.pc` atterrissent dans `/usr/lib/pkgconfig/` :
-- `orc-devel.i686`, `sysprof-capture-devel.i686`, `libffi-devel.i686`, `pcre2-devel.i686`, `libgudev-devel.i686`, `mesa-libgbm-devel.i686`, `libxcb-devel.i686`, `elfutils-devel.i686`, `libXau-devel.i686`, `systemd-devel.i686`, `libzstd-devel.i686`, `libcap-devel.i686`
+- `orc-devel.i686`, `sysprof-capture-devel.i686`, `libffi-devel.i686`, `pcre2-devel.i686`, `libgudev-devel.i686`, `mesa-libgbm-devel.i686`, `libxcb-devel.i686`, `elfutils-devel.i686`, `libXau-devel.i686`, `systemd-devel.i686`, `libzstd-devel.i686`, `libcap-devel.i686`, `libXdamage-devel.i686`, `libXtst-devel.i686`, `nettle-devel.i686`, `libmount-devel.i686`, `libselinux-devel.i686`, `libblkid-devel.i686`, `libatomic.i686`
 
-## gst-libav — TERMINÉ
+## GStreamer monorepo — TERMINÉ
 
-- Containerfile : build gst-libav 64+32 bit (meson) + rpath vers FFmpeg + `dnf install -y meson` de sécurité + `rpm -ivh` (pas `-Uvh`)
-- CI workflow : étape "Build gst-libav for winegstreamer" + bundling dans Package + `dnf install -y meson` + `rpm -ivh`
-- test-build.sh : copie gst-libav + rpath dans l'output (chemin `lib64` corrigé pour 64-bit)
-- winegstreamer.so 32-bit : fix via les i686 transitive deps
+- Containerfile : build GStreamer monorepo 64+32 bit (meson) + .pc copiés + ldconfig
+- CI workflow : étape "Build GStreamer for winegstreamer" + bundling plugins+libs+scanner + rpath
+- test-build.sh : copie plugins+libs+scanner + `--force-rpath` + rpath winegstreamer.so + `--no-cache` support
+- winegstreamer.so 32-bit : fix via les i686 transitive deps (libXdamage, libXtst, nettle, libmount, libselinux, libblkid, libatomic)
 
 ## winegstreamer NV12 buffer size mismatch — EN COURS
 
