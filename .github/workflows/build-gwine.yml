@@ -229,13 +229,9 @@ jobs:
 
           cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/
           cp /opt/ffmpeg32/lib/pkgconfig/*.pc /usr/lib/pkgconfig/
-          cp /opt/gst64/lib64/pkgconfig/gstreamer*.pc /usr/lib64/pkgconfig/
-          cp /opt/gst32/lib/pkgconfig/gstreamer*.pc /usr/lib/pkgconfig/
 
           echo "/opt/ffmpeg64/lib" > /etc/ld.so.conf.d/ffmpeg64.conf
           echo "/opt/ffmpeg32/lib" > /etc/ld.so.conf.d/ffmpeg32.conf
-          echo "/opt/gst64/lib64" > /etc/ld.so.conf.d/gst64.conf
-          echo "/opt/gst32/lib" > /etc/ld.so.conf.d/gst32.conf
           ldconfig
 
           for f in /opt/ffmpeg64/lib/libav*.so.* /opt/ffmpeg64/lib/libsw*.so.*; do
@@ -296,6 +292,12 @@ jobs:
           meson compile -C build64 -j$(nproc)
           meson install -C build64
           rm -rf /tmp/gstreamer
+
+          cp /opt/gst64/lib64/pkgconfig/gstreamer*.pc /usr/lib64/pkgconfig/
+          cp /opt/gst32/lib/pkgconfig/gstreamer*.pc /usr/lib/pkgconfig/
+          echo "/opt/gst64/lib64" > /etc/ld.so.conf.d/gst64.conf
+          echo "/opt/gst32/lib" > /etc/ld.so.conf.d/gst32.conf
+          ldconfig
 
       - name: Clone wine-tkg-git repo and configure
         working-directory: /home/runner/work/
