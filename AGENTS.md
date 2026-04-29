@@ -159,7 +159,7 @@ Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 
 
 - Containerfile : build GStreamer monorepo 64+32 bit (meson) + .pc copiés + ldconfig
 - CI workflow : étape "Build GStreamer for winegstreamer" + bundling plugins+libs+scanner + rpath
-- test-build.sh : copie plugins+libs+scanner + `--force-rpath` + rpath winegstreamer.so + `--no-cache` support
+- test-build.sh : copie plugins+libs+scanner + `--set-rpath` (pas `--force-rpath` !) + rpath winegstreamer.so + `--no-cache` support
 - winegstreamer.so 32-bit : fix via les i686 transitive deps (libXdamage, libXtst, nettle, libmount, libselinux, libblkid, libatomic)
 
 ## winegstreamer NV12 buffer size mismatch — EN COURS
@@ -221,6 +221,27 @@ Format : `[variant] type: message`
 - variant : `gwine`, `gwine-proton`, ou `all`
 - type : `feat`, `fix`, `chore`, `ci`
 - Exemples : `[gwine-proton] feat: add FFmpeg build for winedmo`, `[all] fix: correct rpath on winedmo.so`
+
+## patchelf --force-rpath : NE JAMAIS utiliser sur winegstreamer.so
+
+`patchelf --force-rpath` peut déplacer les sections `.init` et `.plt` du premier segment PT_LOAD (R+E, exécutable) vers le dernier (RW, non-exécutable). Sur un système avec NX (tous les CPU modernes), le code dans un segment non-exécutable crashe avec SIGSEGV au premier `call` via la PLT ou au `.init`.
+
+**Symptôme** : `winegstreamer.dll` échoue à charger (`couldn't load in-process dll`) avec un crash à `winegstreamer.so + 0x198` (dans le padding avant `.text`, pas du code valide). Registre `EBX=5` (pointeur GOT corrompu car `.init` n'a jamais pu s'exécuter pour l'initialiser).
+
+**Solution** :
+1. Toujours essayer `patchelf --set-rpath` (sans `--force-rpath`) d'abord
+2. Si le nouveau RPATH est plus long que l'ancien, `--set-rpath` échoue proprement sans corrompre l'ELF
+3. Fallback `--force-rpath` uniquement en dernier recours, avec un avertissement visible
+
+**Vérification** : après patchelf, vérifier que `.init` et `.plt` sont toujours dans le premier segment PT_LOAD (flags `R E`) :
+```bash
+readelf -S winegstreamer.so | grep -E "\.init|\.plt"
+# Doit afficher des adresses < 0x10000 (premier segment), pas > 0x40000
+```
+
+## Ne pas tester les .so en standalone
+
+Charger un `.so` via `ld-linux.so.2 /path/to/lib.so` **crash toujours** (SIGSEGV) car une bibliothèque partagée n'a pas de `main`. Ce n'est pas un bug — c'est le comportement normal. Pour tester un `.so`, il faut le charger via `dlopen()` dans un processus existant (ex: Wine).
 
 ## Langue
 
