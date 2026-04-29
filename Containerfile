@@ -97,7 +97,6 @@ RUN git clone --depth 1 --branch "${GST_VER}" https://gitlab.freedesktop.org/gst
       -Dwerror=false \
       -Dgstreamer:ptp-helper=disabled \
       -Dgst-plugins-base:pango=disabled \
-      -Dgst-plugins-base:gl=disabled \
       -Dgst-plugins-good:gtk3=disabled \
       -Dgst-plugins-good:cairo=disabled \
       -Dgst-plugins-good:gdk-pixbuf=disabled \

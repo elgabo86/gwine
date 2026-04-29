@@ -130,8 +130,41 @@ done
 for f in "${GST32_DIR}/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --force-rpath --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
 for f in "${GST64_DIR}/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --force-rpath --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
 
-for f in "${UNIX64}/"winegstreamer.so; do patchelf --force-rpath --set-rpath "\$ORIGIN:\$ORIGIN/../../lib64/gst-libs" "$f" 2>/dev/null || true; done
-for f in "${UNIX32}/"winegstreamer.so; do patchelf --force-rpath --set-rpath "\$ORIGIN:\$ORIGIN/../../lib32/gst-libs" "$f" 2>/dev/null || true; done
+GSTLIBS64_RPATH=""
+if [ -d "/build/${DEST}/lib64/gst-libs" ]; then GSTLIBS64_RPATH="lib64/gst-libs"
+elif [ -d "/build/${DEST}/lib/gst-libs" ]; then GSTLIBS64_RPATH="lib/gst-libs"
+fi
+GSTLIBS32_RPATH=""
+if [ -d "/build/${DEST}/lib32/gst-libs" ]; then GSTLIBS32_RPATH="lib32/gst-libs"
+elif [ -d "/build/${DEST}/lib/gst-libs" ]; then GSTLIBS32_RPATH="lib/gst-libs"
+fi
+WG_REL64=""
+UNIX64_BASE=$(basename "${UNIX64}")
+UNIX64_PARENT=$(basename "$(dirname "${UNIX64}")")
+UNIX64_GRANDPARENT=$(basename "$(dirname "$(dirname "${UNIX64}")")")
+if [ "$UNIX64_GRANDPARENT" = "lib" ] || [ "$UNIX64_GRANDPARENT" = "lib64" ]; then
+  WG_REL64="../../../${GSTLIBS64_RPATH}"
+else
+  WG_REL64="../../${GSTLIBS64_RPATH}"
+fi
+WG_REL32=""
+UNIX32_BASE=$(basename "${UNIX32}")
+UNIX32_PARENT=$(basename "$(dirname "${UNIX32}")")
+UNIX32_GRANDPARENT=$(basename "$(dirname "$(dirname "${UNIX32}")")")
+if [ "$UNIX32_GRANDPARENT" = "lib" ] || [ "$UNIX32_GRANDPARENT" = "lib32" ]; then
+  WG_REL32="../../../${GSTLIBS32_RPATH}"
+else
+  WG_REL32="../../${GSTLIBS32_RPATH}"
+fi
+for f in "${UNIX64}/"winegstreamer.so; do
+  [ -n "${GSTLIBS64_RPATH}" ] && patchelf --set-rpath "\$ORIGIN:${WG_REL64}" "$f" 2>/dev/null && echo "patchelf OK: $f" || { echo "WARNING: patchelf failed on $f, trying with --force-rpath (may corrupt ELF)"; patchelf --force-rpath --set-rpath "\$ORIGIN:${WG_REL64}" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath also failed on $f"; }
+done
+for f in "${UNIX32}/"winegstreamer.so; do
+  [ -n "${GSTLIBS32_RPATH}" ] && patchelf --set-rpath "\$ORIGIN:${WG_REL32}" "$f" 2>/dev/null && echo "patchelf OK: $f" || { echo "WARNING: patchelf failed on $f, trying with --force-rpath (may corrupt ELF)"; patchelf --force-rpath --set-rpath "\$ORIGIN:${WG_REL32}" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath also failed on $f"; }
+done
+
+for f in "${UNIX64}/"winedmo.so; do patchelf --set-rpath "\$ORIGIN" "$f" 2>/dev/null || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath failed on $f"; }; done
+for f in "${UNIX32}/"winedmo.so; do patchelf --set-rpath "\$ORIGIN" "$f" 2>/dev/null || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath failed on $f"; }; done
 
 cp -a /opt/icu68/win64/*.dll "${PE64}/" 2>/dev/null || true
 cp -a /opt/icu68/win32/*.dll "${PE32}/" 2>/dev/null || true

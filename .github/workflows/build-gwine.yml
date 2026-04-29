@@ -265,7 +265,6 @@ jobs:
             -Dwerror=false \
             -Dgstreamer:ptp-helper=disabled \
             -Dgst-plugins-base:pango=disabled \
-            -Dgst-plugins-base:gl=disabled \
             -Dgst-plugins-good:gtk3=disabled \
             -Dgst-plugins-good:cairo=disabled \
             -Dgst-plugins-good:gdk-pixbuf=disabled \
@@ -371,6 +370,9 @@ jobs:
           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
           cp -a /opt/gst64/lib64/libgst*-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
+          mkdir -p "gwine-proton-$VERSION/lib64/libexec/gstreamer-1.0" "gwine-proton-$VERSION/lib32/libexec/gstreamer-1.0"
+          cp -a /opt/gst64/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-proton-$VERSION/lib64/libexec/gstreamer-1.0/" 2>/dev/null || true
+          cp -a /opt/gst32/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-proton-$VERSION/lib32/libexec/gstreamer-1.0/" 2>/dev/null || true
 
           UNIX32_RPATH=""
           for d in "gwine-proton-$VERSION"/lib/wine/i386-unix "gwine-proton-$VERSION"/lib32/wine/i386-unix; do
@@ -380,11 +382,40 @@ jobs:
           for d in "gwine-proton-$VERSION"/lib/wine/x86_64-unix "gwine-proton-$VERSION"/lib64/wine/x86_64-unix; do
             if [ -d "$d" ]; then UNIX64_RPATH="${d#gwine-proton-$VERSION/}"; break; fi
           done
-          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
-          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-$VERSION/lib32/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX32_RPATH" ] && patchelf --force-rpath --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX32_RPATH}" "$f" 2>/dev/null || true; done
+          for f in "gwine-proton-$VERSION/lib64/gstreamer-1.0/"libgst*.so; do [ -n "$UNIX64_RPATH" ] && patchelf --force-rpath --set-rpath "\$ORIGIN/../gst-libs:\$ORIGIN/../../${UNIX64_RPATH}" "$f" 2>/dev/null || true; done
 
-          for f in "${UNIX64}/"winegstreamer.so; do patchelf --set-rpath "\$ORIGIN:\$ORIGIN/../../lib64/gst-libs" "$f" 2>/dev/null || true; done
-          for f in "${UNIX32}/"winegstreamer.so; do patchelf --set-rpath "\$ORIGIN:\$ORIGIN/../../lib32/gst-libs" "$f" 2>/dev/null || true; done
+          GSTLIBS64_RPATH=""
+          if [ -d "gwine-proton-$VERSION/lib64/gst-libs" ]; then GSTLIBS64_RPATH="lib64/gst-libs"
+          elif [ -d "gwine-proton-$VERSION/lib/gst-libs" ]; then GSTLIBS64_RPATH="lib/gst-libs"
+          fi
+          GSTLIBS32_RPATH=""
+          if [ -d "gwine-proton-$VERSION/lib32/gst-libs" ]; then GSTLIBS32_RPATH="lib32/gst-libs"
+          elif [ -d "gwine-proton-$VERSION/lib/gst-libs" ]; then GSTLIBS32_RPATH="lib/gst-libs"
+          fi
+          WG_REL64=""
+          UNIX64_GRANDPARENT=$(basename "$(dirname "$(dirname "${UNIX64}")")")
+          if [ "$UNIX64_GRANDPARENT" = "lib" ] || [ "$UNIX64_GRANDPARENT" = "lib64" ]; then
+            WG_REL64="../../../${GSTLIBS64_RPATH}"
+          else
+            WG_REL64="../../${GSTLIBS64_RPATH}"
+          fi
+          WG_REL32=""
+          UNIX32_GRANDPARENT=$(basename "$(dirname "$(dirname "${UNIX32}")")")
+          if [ "$UNIX32_GRANDPARENT" = "lib" ] || [ "$UNIX32_GRANDPARENT" = "lib32" ]; then
+            WG_REL32="../../../${GSTLIBS32_RPATH}"
+          else
+            WG_REL32="../../${GSTLIBS32_RPATH}"
+          fi
+          for f in "${UNIX64}/"winegstreamer.so; do
+            [ -n "${GSTLIBS64_RPATH}" ] && patchelf --set-rpath "\$ORIGIN:${WG_REL64}" "$f" 2>/dev/null && echo "patchelf OK: $f" || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN:${WG_REL64}" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath also failed on $f"; }
+          done
+          for f in "${UNIX32}/"winegstreamer.so; do
+            [ -n "${GSTLIBS32_RPATH}" ] && patchelf --set-rpath "\$ORIGIN:${WG_REL32}" "$f" 2>/dev/null && echo "patchelf OK: $f" || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN:${WG_REL32}" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath also failed on $f"; }
+          done
+
+          for f in "${UNIX64}/"winedmo.so; do patchelf --set-rpath "\$ORIGIN" "$f" 2>/dev/null || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath failed on $f"; }; done
+          for f in "${UNIX32}/"winedmo.so; do patchelf --set-rpath "\$ORIGIN" "$f" 2>/dev/null || { echo "WARNING: patchelf failed on $f, trying with --force-rpath"; patchelf --force-rpath --set-rpath "\$ORIGIN" "$f" 2>/dev/null || echo "FATAL: patchelf --force-rpath failed on $f"; }; done
 
           mkdir -p /tmp/icu68 && \
           curl -L "https://github.com/unicode-org/icu/releases/download/release-68-2/icu4c-68_2-Win64-MSVC2019.zip" -o /tmp/icu68/win64.zip && \
