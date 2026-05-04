@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: gwine <gwine@localhost>
+Date: Mon, 4 May 2026 00:00:00 +0200
+Subject: [PATCH] advapi32: Use WINEUSERNAME env var instead of hardcoded steamuser
+
+Proton hardcode "steamuser" comme nom d'utilisateur Wine dans
+GetUserNameA/GetUserNameW. Cela crée un dossier "steamuser" dans
+le prefix au lieu d'utiliser le vrai nom d'utilisateur Unix.
+Ce patch rétablit le comportement Wine standard qui lit la variable
+d'environnement WINEUSERNAME (set par wineserver depuis le vrai
+nom d'utilisateur Unix).
+
+---
+ dlls/advapi32/advapi.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/dlls/advapi32/advapi.c b/dlls/advapi32/advapi.c
+index 127cec5..2284e92 100644
+--- a/dlls/advapi32/advapi.c
++++ b/dlls/advapi32/advapi.c
+@@ -44,15 +44,14 @@ WINE_DEFAULT_DEBUG_CHANNEL(advapi);
+  */
+ BOOL WINAPI GetUserNameA( LPSTR name, LPDWORD size )
+ {
+-    static const char steamuserA[] = {'s','t','e','a','m','u','s','e','r',0};
+-    if(*size < ARRAY_SIZE(steamuserA)){
+-        SetLastError( ERROR_INSUFFICIENT_BUFFER );
+-        *size = ARRAY_SIZE(steamuserA);
+-        return FALSE;
+-    }
+-    memcpy(name, steamuserA, sizeof(steamuserA));
+-    *size = ARRAY_SIZE(steamuserA);
+-    return TRUE;
++    DWORD len = GetEnvironmentVariableA( "WINEUSERNAME", name, *size );
++    BOOL ret;
++
++    if (!len) return FALSE;
++    if ((ret = (len < *size))) len++;
++    else SetLastError( ERROR_INSUFFICIENT_BUFFER );
++    *size = len;
++    return ret;
+ }
+ 
+ /******************************************************************************
+@@ -60,15 +59,14 @@ BOOL WINAPI GetUserNameA( LPSTR name, LPDWORD size )
+  */
+ BOOL WINAPI GetUserNameW( LPWSTR name, LPDWORD size )
+ {
+-    static const WCHAR steamuserW[] = {'s','t','e','a','m','u','s','e','r',0};
+-    if(*size < ARRAY_SIZE(steamuserW)){
+-        SetLastError( ERROR_INSUFFICIENT_BUFFER );
+-        *size = ARRAY_SIZE(steamuserW);
+-        return FALSE;
+-    }
+-    memcpy(name, steamuserW, sizeof(steamuserW));
+-    *size = ARRAY_SIZE(steamuserW);
+-    return TRUE;
++    DWORD len = GetEnvironmentVariableW( L"WINEUSERNAME", name, *size );
++    BOOL ret;
++
++    if (!len) return FALSE;
++    if ((ret = (len < *size))) len++;
++    else SetLastError( ERROR_INSUFFICIENT_BUFFER );
++    *size = len;
++    return ret;
+ }
+ 
+ /******************************************************************************
+-- 
+2.49.0

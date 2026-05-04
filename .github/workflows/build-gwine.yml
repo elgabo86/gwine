@@ -58,6 +58,7 @@ jobs:
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/opencl_linux_fix.mypatch
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/use_real_username.mypatch
             echo "Removed proton-specific and local-test patches for gwine build"
           fi
 

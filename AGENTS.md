@@ -23,6 +23,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
   - `opencl_linux_fix.mypatch` — Ajoute `AC_CHECK_LIB(OpenCL,clGetPlatformInfo)` dans le cas `*)` de `configure.ac` pour que `OPENCL_LIBS="-lOpenCL"` soit set sur Linux (gwine-proton uniquement, exclu de gwine)
   - `wmadec_getcurrenttype.mypatch` — Implémente `transform_GetInputCurrentType` et `transform_GetOutputCurrentType` dans `wma_decoder.c` (stub E_NOTIMPL → convertit DMO_MEDIA_TYPE en IMFMediaType via MFCreateMediaTypeFromRepresentation). Le stub E_NOTIMPL causait un crash quand la DLL native xaudio2_7 appelle GetInputCurrentType sur le MFT wmadec (null pointer deref). Portée : gwine + gwine-proton
   - `disable_mediaconv_fallback.mypatch` — Désactive le fallback `use_mediaconv` dans `wg_parser.c` : "Proton video converter" est toujours skippé par `autoplug_select_cb`, pas de retry avec mediaconv si le 1er essai échoue. Sans ce patch, `protonvideoconverter` substitue la vidéo par un blank quand il n'y a pas de cache fozdb. Portée : gwine-proton uniquement
+  - `use_real_username.mypatch` — Remplace le `steamuser` hardcodé dans `GetUserNameA/GetUserNameW` de `dlls/advapi32/advapi.c` par l'API Wine standard qui lit `WINEUSERNAME` (set par wineserver depuis le vrai nom d'utilisateur Unix). Sans ce patch, le dossier utilisateur dans le prefix Wine s'appelle toujours `steamuser` au lieu du nom réel. Portée : gwine-proton uniquement (exclu de gwine)
 
 ## Build
 
