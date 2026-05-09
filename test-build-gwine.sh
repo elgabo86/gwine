@@ -45,6 +45,7 @@ if [ -d /patches ]; then
   rm -f wine-tkg-userpatches/winegstreamer_nv12_buffer_fix.mypatch
   rm -f wine-tkg-userpatches/opencl_linux_fix.mypatch
   rm -f wine-tkg-userpatches/use_real_username.mypatch
+  rm -f wine-tkg-userpatches/content_sniffing_fallback.mypatch
   echo "Copied custom patches (removed proton-specific patches)"
 fi
 

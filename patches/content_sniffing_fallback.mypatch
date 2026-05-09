@@ -1,0 +1,20 @@
+diff --git a/dlls/mfplat/main.c b/dlls/mfplat/main.c
+index 0a7c294..72c1299 100644
+--- a/dlls/mfplat/main.c
++++ b/dlls/mfplat/main.c
+@@ -6339,6 +6339,15 @@ static HRESULT resolver_get_bytestream_handler(IMFByteStream *stream, const WCHA
+ 
+     TRACE( "url_ext %s mimeW %s\n", debugstr_w(url_ext), debugstr_w(mimeW) );
+ 
++    /* If neither extension nor MIME type is available, try content sniffing
++     * before falling through to the error path. Many games (e.g. Legend of Mana)
++     * ship video files without extensions and without setting MIME types. */
++    if (!url_ext && !mimeW)
++    {
++        if (SUCCEEDED(resolver_get_bytestream_url_hint(stream, &url_ext)))
++            TRACE("Content sniffing detected extension %s\n", debugstr_w(url_ext));
++    }
++
+     if (url_ext || mimeW)
+     {
+         hr = resolver_create_bytestream_handler(stream, flags, mimeW, url_ext, handler);
