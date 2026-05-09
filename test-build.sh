@@ -112,7 +112,9 @@ GSTLIBS64_DIR="/build/${DEST}/lib64/gst-libs"
 GSTLIBS_LIB_DIR="/build/${DEST}/lib/gst-libs"
 mkdir -p "${GST32_DIR}" "${GST64_DIR}" "${GSTLIBS32_DIR}" "${GSTLIBS64_DIR}" "${GSTLIBS_LIB_DIR}"
 cp -a /opt/gst32/lib/gstreamer-1.0/libgst*.so "${GST32_DIR}/" 2>/dev/null || true
+rm -f "${GST32_DIR}/libgstges.so"
 cp -a /opt/gst64/lib64/gstreamer-1.0/libgst*.so "${GST64_DIR}/" 2>/dev/null || true
+rm -f "${GST64_DIR}/libgstges.so"
 cp -a /opt/gst32/lib/libgst*-1.0.so* "${GSTLIBS32_DIR}/" 2>/dev/null || true
 cp -a /opt/gst64/lib64/libgst*-1.0.so* "${GSTLIBS64_DIR}/" 2>/dev/null || true
 cp -a /opt/gst32/lib/libgst*-1.0.so* "${GSTLIBS_LIB_DIR}/" 2>/dev/null || true

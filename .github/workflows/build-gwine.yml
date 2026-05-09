@@ -368,7 +368,9 @@ jobs:
           mkdir -p "gwine-proton-$VERSION/lib32/gstreamer-1.0" "gwine-proton-$VERSION/lib64/gstreamer-1.0"
           mkdir -p "gwine-proton-$VERSION/lib32/gst-libs" "gwine-proton-$VERSION/lib64/gst-libs" "gwine-proton-$VERSION/lib/gst-libs"
           cp -a /opt/gst32/lib/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib32/gstreamer-1.0/" 2>/dev/null || true
+          rm -f "gwine-proton-$VERSION/lib32/gstreamer-1.0/libgstges.so"
           cp -a /opt/gst64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
+          rm -f "gwine-proton-$VERSION/lib64/gstreamer-1.0/libgstges.so"
           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
           cp -a /opt/gst64/lib64/libgst*-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
