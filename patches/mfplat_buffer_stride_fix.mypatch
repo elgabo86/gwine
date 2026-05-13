@@ -1,0 +1,93 @@
+diff --git a/dlls/mfplat/buffer.c b/dlls/mfplat/buffer.c
+index 5354486..85ea0ac 100644
+--- a/dlls/mfplat/buffer.c
++++ b/dlls/mfplat/buffer.c
+@@ -337,8 +337,8 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
+ 
+             if (pitch < 0)
+                 pitch = -pitch;
+-            copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->data, pitch,
+-                    buffer->_2d.width, buffer->_2d.height);
++            copy_image(buffer, buffer->_2d.linear_buffer, pitch, buffer->data, pitch,
++                    pitch, buffer->_2d.height);
+         }
+     }
+ 
+@@ -385,8 +385,8 @@ static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
+ 
+         if (pitch < 0)
+             pitch = -pitch;
+-        copy_image(buffer, buffer->data, pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
+-                buffer->_2d.width, buffer->_2d.height);
++        copy_image(buffer, buffer->data, pitch, buffer->_2d.linear_buffer, pitch,
++                pitch, buffer->_2d.height);
+ 
+         free(buffer->_2d.linear_buffer);
+         buffer->_2d.linear_buffer = NULL;
+@@ -435,8 +435,8 @@ static HRESULT WINAPI d3d9_surface_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
+             hr = IDirect3DSurface9_LockRect(buffer->d3d9_surface.surface, &rect, NULL, 0);
+             if (SUCCEEDED(hr))
+             {
+-                copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, rect.pBits, rect.Pitch,
+-                        buffer->_2d.width, buffer->_2d.height);
++                copy_image(buffer, buffer->_2d.linear_buffer, rect.Pitch, rect.pBits, rect.Pitch,
++                        rect.Pitch, buffer->_2d.height);
+                 IDirect3DSurface9_UnlockRect(buffer->d3d9_surface.surface);
+             }
+         }
+@@ -474,8 +474,8 @@ static HRESULT WINAPI d3d9_surface_buffer_Unlock(IMFMediaBuffer *iface)
+ 
+         if (SUCCEEDED(hr = IDirect3DSurface9_LockRect(buffer->d3d9_surface.surface, &rect, NULL, 0)))
+         {
+-            copy_image(buffer, rect.pBits, rect.Pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
+-                    buffer->_2d.width, buffer->_2d.height);
++            copy_image(buffer, rect.pBits, rect.Pitch, buffer->_2d.linear_buffer, rect.Pitch,
++                    rect.Pitch, buffer->_2d.height);
+             IDirect3DSurface9_UnlockRect(buffer->d3d9_surface.surface);
+         }
+ 
+@@ -661,8 +661,8 @@ static HRESULT WINAPI memory_2d_buffer_ContiguousCopyTo(IMF2DBuffer2 *iface, BYT
+     {
+         if (src_pitch < 0)
+             src_pitch = -src_pitch;
+-        copy_image(buffer, dest_buffer, buffer->_2d.width, src_buffer_start, src_pitch,
+-                buffer->_2d.width, buffer->_2d.height);
++        copy_image(buffer, dest_buffer, src_pitch, src_buffer_start, src_pitch,
++                src_pitch, buffer->_2d.height);
+ 
+         if (FAILED(IMF2DBuffer2_Unlock2D(iface)))
+             WARN("Couldn't unlock source buffer %p, hr %#lx.\n", iface, hr);
+@@ -690,8 +690,8 @@ static HRESULT WINAPI memory_2d_buffer_ContiguousCopyFrom(IMF2DBuffer2 *iface, c
+     {
+         if (dst_pitch < 0)
+             dst_pitch = -dst_pitch;
+-        copy_image(buffer, dst_buffer_start, dst_pitch, src_buffer, buffer->_2d.width,
+-                buffer->_2d.width, buffer->_2d.height);
++        copy_image(buffer, dst_buffer_start, dst_pitch, src_buffer, dst_pitch,
++                dst_pitch, buffer->_2d.height);
+ 
+         if (FAILED(IMF2DBuffer2_Unlock2D(iface)))
+             WARN("Couldn't unlock destination buffer %p, hr %#lx.\n", iface, hr);
+@@ -1069,8 +1069,10 @@ static HRESULT WINAPI dxgi_surface_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
+             hr = dxgi_surface_buffer_map(buffer, MF2DBuffer_LockFlags_ReadWrite);
+             if (SUCCEEDED(hr))
+             {
+-                copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->dxgi_surface.map_desc.pData,
+-                        buffer->dxgi_surface.map_desc.RowPitch, buffer->_2d.width, buffer->_2d.height);
++                copy_image(buffer, buffer->_2d.linear_buffer, buffer->dxgi_surface.map_desc.RowPitch,
++                        buffer->dxgi_surface.map_desc.pData,
++                        buffer->dxgi_surface.map_desc.RowPitch,
++                        buffer->dxgi_surface.map_desc.RowPitch, buffer->_2d.height);
+             }
+         }
+     }
+@@ -1104,7 +1106,8 @@ static HRESULT WINAPI dxgi_surface_buffer_Unlock(IMFMediaBuffer *iface)
+     else if (!--buffer->_2d.locks)
+     {
+         copy_image(buffer, buffer->dxgi_surface.map_desc.pData, buffer->dxgi_surface.map_desc.RowPitch,
+-                buffer->_2d.linear_buffer, buffer->_2d.width, buffer->_2d.width, buffer->_2d.height);
++                buffer->_2d.linear_buffer, buffer->dxgi_surface.map_desc.RowPitch,
++                buffer->dxgi_surface.map_desc.RowPitch, buffer->_2d.height);
+         dxgi_surface_buffer_unmap(buffer, MF2DBuffer_LockFlags_ReadWrite);
+ 
+         free(buffer->_2d.linear_buffer);

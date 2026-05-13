@@ -60,7 +60,9 @@ jobs:
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/opencl_linux_fix.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/use_real_username.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/content_sniffing_fallback.mypatch
-            echo "Removed proton-specific and local-test patches for gwine build"
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/mpeg4_m4s2_decoder_fix.mypatch
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/mfplat_buffer_stride_fix.mypatch
+            echo "Removed proton-specific patches for gwine build"
           fi
 
       - name: Start build

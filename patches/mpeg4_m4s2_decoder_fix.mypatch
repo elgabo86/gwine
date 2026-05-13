@@ -1,0 +1,106 @@
+diff --git a/dlls/winegstreamer/video_decoder.c b/dlls/winegstreamer/video_decoder.c
+index df84fba..bcfa075 100644
+--- a/dlls/winegstreamer/video_decoder.c
++++ b/dlls/winegstreamer/video_decoder.c
+@@ -1826,12 +1826,20 @@ static const GUID *const wmv_decoder_input_types[] =
+     &MEDIASUBTYPE_WVC1,
+     &MEDIASUBTYPE_WMV3,
+     &MEDIASUBTYPE_VC1S,
++    &MFVideoFormat_M4S2,
++    &MFVideoFormat_MP4V,
++    &MFVideoFormat_MP4S,
+     &MFVideoFormat_theora,
+     &MFVideoFormat_AV1,
+     &MFVideoFormat_VP90,
+ };
+ static const GUID *const wmv_decoder_output_types[] =
+ {
++    &MFVideoFormat_RGB32,
++    &MFVideoFormat_RGB24,
++    &MFVideoFormat_RGB565,
++    &MFVideoFormat_RGB555,
++    &MFVideoFormat_RGB8,
+     &MFVideoFormat_NV12,
+     &MFVideoFormat_YV12,
+     &MFVideoFormat_IYUV,
+@@ -1840,11 +1848,6 @@ static const GUID *const wmv_decoder_output_types[] =
+     &MFVideoFormat_UYVY,
+     &MFVideoFormat_YVYU,
+     &MFVideoFormat_NV11,
+-    &MFVideoFormat_RGB32,
+-    &MFVideoFormat_RGB24,
+-    &MFVideoFormat_RGB565,
+-    &MFVideoFormat_RGB555,
+-    &MFVideoFormat_RGB8,
+ };
+ 
+ HRESULT wmv_decoder_create(IUnknown *outer, IUnknown **out)
+diff --git a/dlls/winegstreamer/wg_media_type.c b/dlls/winegstreamer/wg_media_type.c
+index 1b29474..1311662 100644
+--- a/dlls/winegstreamer/wg_media_type.c
++++ b/dlls/winegstreamer/wg_media_type.c
+@@ -408,6 +408,17 @@ static void init_caps_from_video_mpeg(GstCaps *caps, const struct mpeg_video_for
+     gst_caps_set_simple(caps, "parsed", G_TYPE_BOOLEAN, TRUE, NULL);
+ }
+ 
++static void init_caps_from_video_mpeg4(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size)
++{
++    init_caps_codec_data(caps, format + 1, format_size - sizeof(*format));
++
++    gst_structure_remove_field(gst_caps_get_structure(caps, 0), "format");
++    gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/mpeg");
++    gst_caps_set_simple(caps, "mpegversion", G_TYPE_INT, 4, NULL);
++    gst_caps_set_simple(caps, "systemstream", G_TYPE_BOOLEAN, FALSE, NULL);
++    gst_caps_set_simple(caps, "parsed", G_TYPE_BOOLEAN, TRUE, NULL);
++}
++
+ static void init_caps_from_video_theora(GstCaps *caps, const MFVIDEOFORMAT *format, UINT format_size)
+ {
+     init_caps_codec_data(caps, format + 1, format_size - sizeof(*format));
+@@ -452,6 +463,14 @@ static void init_caps_from_video_subtype(GstCaps *caps, const GUID *subtype, con
+         return init_caps_from_video_indeo(caps, format, format_size);
+     if (IsEqualGUID(subtype, &MEDIASUBTYPE_MPEG1Payload))
+         return init_caps_from_video_mpeg(caps, format, format_size);
++    if (IsEqualGUID(subtype, &MFVideoFormat_M4S2))
++        return init_caps_from_video_mpeg4(caps, format, format_size);
++    if (IsEqualGUID(subtype, &MFVideoFormat_MP4V))
++        return init_caps_from_video_mpeg4(caps, format, format_size);
++    if (IsEqualGUID(subtype, &MFVideoFormat_MP4S))
++        return init_caps_from_video_mpeg4(caps, format, format_size);
++    if (IsEqualGUID(subtype, &MFVideoFormat_MP43))
++        return init_caps_from_video_mpeg4(caps, format, format_size);
+     if (IsEqualGUID(subtype, &MFVideoFormat_theora))
+         return init_caps_from_video_theora(caps, format, format_size);
+     if (IsEqualGUID(subtype, &MFVideoFormat_AV1))
+@@ -928,7 +947,15 @@ NTSTATUS caps_to_media_type(GstCaps *caps, struct wg_media_type *media_type, UIN
+         if (!strcmp(name, "video/x-wmv"))
+             return wmv_video_format_from_gst_caps(caps, media_type->u.video, &media_type->format_size, video_plane_align);
+         if (!strcmp(name, "video/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
+-            return mpeg_video_format_from_gst_caps(caps, media_type->u.format, &media_type->format_size, video_plane_align);
++        {
++            gint mpeg_version = 1;
++            gst_structure_get_int(structure, "mpegversion", &mpeg_version);
++            if (mpeg_version == 4)
++                return video_format_from_gst_caps(caps, &MFVideoFormat_M4S2, media_type->u.video,
++                        &media_type->format_size, video_plane_align);
++            return mpeg_video_format_from_gst_caps(caps, media_type->u.format,
++                    &media_type->format_size, video_plane_align);
++        }
+ 
+         GST_FIXME("Unhandled caps %" GST_PTR_FORMAT ".", caps);
+         return STATUS_UNSUCCESSFUL;
+diff --git a/dlls/wmvdecod/wmvdecod.c b/dlls/wmvdecod/wmvdecod.c
+index 6932c89..0874828 100644
+--- a/dlls/wmvdecod/wmvdecod.c
++++ b/dlls/wmvdecod/wmvdecod.c
+@@ -66,6 +66,10 @@ HRESULT WINAPI DllRegisterServer(void)
+         {MFMediaType_Video, MEDIASUBTYPE_WMVA},
+         {MFMediaType_Video, MFVideoFormat_WVC1},
+         {MFMediaType_Video, MEDIASUBTYPE_VC1S},
++        {MFMediaType_Video, MFVideoFormat_M4S2},
++        {MFMediaType_Video, MFVideoFormat_MP4V},
++        {MFMediaType_Video, MFVideoFormat_MP4S},
++        {MFMediaType_Video, MFVideoFormat_MP43},
+         {MFMediaType_Video, MFVideoFormat_theora},
+         {MFMediaType_Video, MFVideoFormat_AV1},
+         {MFMediaType_Video, MFVideoFormat_VP90},
