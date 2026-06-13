@@ -34,8 +34,7 @@ sed -i 's/_proton_mf_patches="false"/_proton_mf_patches="true"/g' customization.
 sed -i 's/_msvcrt_nativebuiltin="false"/_msvcrt_nativebuiltin="true"/g' customization.cfg
 sed -i 's/_win10_default="false"/_win10_default="true"/g' customization.cfg
 sed -i 's/_protonify="false"/_protonify="true"/g' customization.cfg
-sed -i 's/_NOLIB32="wow64"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
-sed -i 's/_NOLIB32="true"/_NOLIB32="false"/g' wine-tkg-profiles/advanced-customization.cfg
+sed -i 's/_NOLIB32="false"/_NOLIB32="wow64"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_NOCCACHE="false"/_NOCCACHE="true"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_PKGNAME_OVERRIDE=""/_PKGNAME_OVERRIDE="none"/g' wine-tkg-profiles/advanced-customization.cfg
 sed -i 's/_sdl_joy_support="false"/_sdl_joy_support="true"/g' wine-tkg-profiles/advanced-customization.cfg
