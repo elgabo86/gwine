@@ -32,6 +32,7 @@ jobs:
         run: |
           git clone https://github.com/Frogging-Family/wine-tkg-git.git
           curl -L "https://raw.githubusercontent.com/gohryt/wine-tkg-git/gohryt-1/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton-sdl-joy/proton10-sdl-joy.patch" -o wine-tkg-git/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton-sdl-joy/proton10-sdl-joy.patch
+          curl -L "https://raw.githubusercontent.com/gohryt/wine-tkg-git/gohryt-1/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton_eac/Revert-ntdll-Get-rid-of-the-wine_nt_to_unix_file_nam.patch" -o wine-tkg-git/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton_eac/Revert-ntdll-Get-rid-of-the-wine_nt_to_unix_file_nam.patch
           cd wine-tkg-git/wine-tkg-git
           sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
           sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
@@ -63,6 +64,7 @@ jobs:
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/content_sniffing_fallback.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/mpeg4_m4s2_decoder_fix.mypatch
             rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/mfplat_buffer_stride_fix.mypatch
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/disable_mediaconv_fallback.mypatch
             echo "Removed proton-specific patches for gwine build"
           fi
 

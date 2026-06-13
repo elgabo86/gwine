@@ -15,11 +15,14 @@ podman run --rm -i \
   -v "${OUTPUT_DIR}:/output:z" \
   "${IMAGE_NAME}" \
   bash << 'CONTAINER_SCRIPT'
-set -euo pipefail
+set -u
 
 cd /build
 git clone https://github.com/Frogging-Family/wine-tkg-git.git
 cd wine-tkg-git/wine-tkg-git
+
+curl -fsSL "https://raw.githubusercontent.com/gohryt/wine-tkg-git/gohryt-1/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton-sdl-joy/proton10-sdl-joy.patch" -o wine-tkg-patches/proton-tkg-specific/proton-sdl-joy/proton10-sdl-joy.patch
+curl -fsSL "https://raw.githubusercontent.com/gohryt/wine-tkg-git/gohryt-1/wine-tkg-git/wine-tkg-patches/proton-tkg-specific/proton_eac/Revert-ntdll-Get-rid-of-the-wine_nt_to_unix_file_nam.patch" -o wine-tkg-patches/proton-tkg-specific/proton_eac/Revert-ntdll-Get-rid-of-the-wine_nt_to_unix_file_nam.patch
 
 sed -i 's/_use_ntsync="false"/_use_ntsync="true"/g' customization.cfg
 sed -i 's/_use_fsync="true"/_use_fsync="false"/g' customization.cfg
@@ -48,6 +51,7 @@ if [ -d /patches ]; then
   rm -f wine-tkg-userpatches/content_sniffing_fallback.mypatch
   rm -f wine-tkg-userpatches/mpeg4_m4s2_decoder_fix.mypatch
   rm -f wine-tkg-userpatches/mfplat_buffer_stride_fix.mypatch
+  rm -f wine-tkg-userpatches/disable_mediaconv_fallback.mypatch
   echo "Copied custom patches (removed proton-specific patches)"
 fi
 
@@ -71,11 +75,13 @@ patchelf --set-rpath '$ORIGIN' "${UNIX32}/winedmo.so" 2>/dev/null || true
 patchelf --set-rpath '$ORIGIN' "/build/${DEST}/lib64/wine/x86_64-unix/winedmo.so" 2>/dev/null || true
 
 GST32=$(ls -d "/build/${DEST}"/lib32/gstreamer-1.0 "/build/${DEST}"/lib/gstreamer-1.0 2>/dev/null | head -n 1)
-mkdir -p "${GST32}" "/build/${DEST}/lib64/gstreamer-1.0"
-cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "${GST32}/" 2>/dev/null || true
-cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstreamer-1.0/" 2>/dev/null || true
-for f in "${GST32}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
-for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+if [ -n "${GST32}" ]; then
+  mkdir -p "${GST32}" "/build/${DEST}/lib64/gstreamer-1.0"
+  cp -a /opt/gst-libav32/lib/gstreamer-1.0/libgst*.so "${GST32}/" 2>/dev/null || true
+  cp -a /opt/gst-libav64/lib64/gstreamer-1.0/libgst*.so "/build/${DEST}/lib64/gstreamer-1.0/" 2>/dev/null || true
+  for f in "${GST32}/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/i386-unix' "$f" 2>/dev/null || true; done
+  for f in "/build/${DEST}/lib64/gstreamer-1.0/"libgst*.so; do patchelf --set-rpath '$ORIGIN/../../wine/x86_64-unix' "$f" 2>/dev/null || true; done
+fi
 
 mv "/build/${DEST}" "/output/gwine-${TIMESTAMP}"
 ln -sfn "gwine-${TIMESTAMP}" "/output/gwine-latest"
