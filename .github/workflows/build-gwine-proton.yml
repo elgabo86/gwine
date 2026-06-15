@@ -40,7 +40,7 @@ jobs:
             zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
             libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
             gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-            libunwind-devel vulkan-devel meson libatomic
+             libunwind-devel vulkan-devel meson libatomic graphene-devel
 
           dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel
 
@@ -67,7 +67,7 @@ jobs:
             libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
             systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 libatomic.i686 \
             libXdamage-devel.i686 libXtst-devel.i686 nettle-devel.i686 \
-            libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686
+             libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686 graphene-devel.i686
 
           mkdir -p /tmp/i686-rpms
           dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true
@@ -256,9 +256,12 @@ jobs:
           rm -f "gwine-proton-$VERSION/lib32/gstreamer-1.0/libgstges.so"
           cp -a /opt/gst64/lib64/gstreamer-1.0/libgst*.so "gwine-proton-$VERSION/lib64/gstreamer-1.0/" 2>/dev/null || true
           rm -f "gwine-proton-$VERSION/lib64/gstreamer-1.0/libgstges.so"
-          cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
-          cp -a /opt/gst64/lib64/libgst*-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
-          cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /opt/gst64/lib64/libgst*-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
+           cp -a /opt/gst32/lib/libgst*-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libgraphene-1.0.so* "gwine-proton-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib64/libgraphene-1.0.so* "gwine-proton-$VERSION/lib64/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libgraphene-1.0.so* "gwine-proton-$VERSION/lib/gst-libs/" 2>/dev/null || true
           mkdir -p "gwine-proton-$VERSION/lib64/libexec/gstreamer-1.0" "gwine-proton-$VERSION/lib32/libexec/gstreamer-1.0"
           cp -a /opt/gst64/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-proton-$VERSION/lib64/libexec/gstreamer-1.0/" 2>/dev/null || true
           cp -a /opt/gst32/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-proton-$VERSION/lib32/libexec/gstreamer-1.0/" 2>/dev/null || true

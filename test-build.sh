@@ -118,6 +118,9 @@ rm -f "${GST64_DIR}/libgstges.so"
 cp -a /opt/gst32/lib/libgst*-1.0.so* "${GSTLIBS32_DIR}/" 2>/dev/null || true
 cp -a /opt/gst64/lib64/libgst*-1.0.so* "${GSTLIBS64_DIR}/" 2>/dev/null || true
 cp -a /opt/gst32/lib/libgst*-1.0.so* "${GSTLIBS_LIB_DIR}/" 2>/dev/null || true
+cp -a /usr/lib/libgraphene-1.0.so* "${GSTLIBS32_DIR}/" 2>/dev/null || true
+cp -a /usr/lib64/libgraphene-1.0.so* "${GSTLIBS64_DIR}/" 2>/dev/null || true
+cp -a /usr/lib/libgraphene-1.0.so* "${GSTLIBS_LIB_DIR}/" 2>/dev/null || true
 mkdir -p "/build/${DEST}/lib64/libexec/gstreamer-1.0" "/build/${DEST}/lib32/libexec/gstreamer-1.0"
 cp -a /opt/gst64/libexec/gstreamer-1.0/gst-plugin-scanner "/build/${DEST}/lib64/libexec/gstreamer-1.0/" 2>/dev/null || true
 cp -a /opt/gst32/libexec/gstreamer-1.0/gst-plugin-scanner "/build/${DEST}/lib32/libexec/gstreamer-1.0/" 2>/dev/null || true

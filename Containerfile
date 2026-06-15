@@ -21,7 +21,7 @@ RUN dnf upgrade -y && \
   zlib-ng-compat-devel wget2 python3-pefile rust cargo glslang patch \
   libgcrypt-devel libXpresent-devel yasm jq pkgconf-pkg-config \
   gcc nasm patchelf curl tar libdrm-devel libxkbcommon-devel \
-  libunwind-devel vulkan-devel meson libatomic && \
+   libunwind-devel vulkan-devel meson libatomic graphene-devel && \
   dnf install -y gstreamer1-devel gstreamer1-plugins-base-devel gtk3-devel && \
   dnf install -y \
   pkgconf.i686 gcc-c++.i686 glibc-devel.i686 libX11-devel.i686 \
@@ -46,7 +46,7 @@ RUN dnf upgrade -y && \
   libxcb-devel.i686 elfutils-devel.i686 libXau-devel.i686 \
   systemd-devel.i686 libzstd-devel.i686 libcap-devel.i686 ocl-icd-devel.i686 libatomic.i686 \
   libXdamage-devel.i686 libXtst-devel.i686 nettle-devel.i686 \
-  libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686 && \
+   libmount-devel.i686 libselinux-devel.i686 libblkid-devel.i686 graphene-devel.i686 && \
   ln -sf /usr/lib/gcc/x86_64-redhat-linux/15/32/libatomic.so /usr/lib/libatomic.so && \
   mkdir -p /tmp/i686-rpms && \
   dnf download --destdir=/tmp/i686-rpms --resolve glib2-devel.i686 gstreamer1-devel.i686 gstreamer1-plugins-base-devel.i686 gtk3-devel.i686 2>/dev/null || true; \
