@@ -1,4 +1,4 @@
-FROM fedora:43
+FROM fedora:44
 
 RUN dnf upgrade -y && \
     dnf install -y \
@@ -65,8 +65,8 @@ RUN curl -L "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VER}.tar.xz" | tar xJ -
 
 RUN cd /tmp/ffmpeg-${FFMPEG_VER} && \
     FFMPEG32_OPTS="--enable-shared --disable-static --disable-programs --disable-doc --disable-inline-asm --disable-all --enable-avcodec --enable-avfilter --enable-avutil --enable-swresample --enable-avformat --enable-swscale --enable-bsfs --enable-zlib --enable-protocol=file --enable-filter=scale --enable-decoder=vc1,vc1image,wmv3,wmv3image,wmv2,wmv1,wmav1,wmav2,wmapro,wmalossless,xma1,xma2 --enable-decoder=h264,hevc,aac,mp3,flac,mpeg4,mpegvideo,mpeg1video,msmpeg4v1,msmpeg4v2,msmpeg4v3 --enable-decoder=gif,apng,mp2,indeo5,adpcm_ms,alac,vorbis,cinepak,msvideo1,msrle,adpcm_ima_wav,ac3,eac3,rawvideo,opus,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_u8,pcm_mulaw,pcm_alaw --enable-demuxer=asf,avi,xwma,matroska,mp4,aac,ogg,mov,mp3,flac,wav,flv,mpegts,mpeg --enable-muxer=asf,asf_stream,flv,mp4,dash,webm,mpegts --enable-parser=mpeg4video,h264,hevc,vc1,ac3,mpegvideo" && \
-    export PKG_CONFIG_PATH="/usr/lib/pkgconfig" CFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib" && \
-    ./configure --prefix=/opt/ffmpeg32 --libdir=/opt/ffmpeg32/lib ${FFMPEG32_OPTS} --target-os=linux --arch=x86_32 --host-cflags="-m32" --host-ldflags="-m32 -L/usr/lib" && \
+    export PKG_CONFIG_PATH="/usr/lib/pkgconfig" CFLAGS="-m32" LDFLAGS="-m32 -L/usr/lib -Wl,-z,notext" && \
+    ./configure --prefix=/opt/ffmpeg32 --libdir=/opt/ffmpeg32/lib ${FFMPEG32_OPTS} --target-os=linux --arch=x86_32 --host-cflags="-m32" --host-ldflags="-m32 -L/usr/lib -Wl,-z,notext" && \
     make -j$(nproc) && make install && rm -rf /tmp/ffmpeg-${FFMPEG_VER}
 
 RUN cp /opt/ffmpeg64/lib/pkgconfig/*.pc /usr/lib64/pkgconfig/ && \

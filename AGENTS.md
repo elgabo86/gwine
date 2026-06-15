@@ -9,7 +9,7 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 | Variant | Base | Container CI | winedmo | Description |
 |---------|------|-------------|---------|-------------|
 | gwine | Wine mainline + staging | artixlinux/artixlinux:latest | Non (topology_loader stub) | Build Wine classique, pas de vidéo MF |
-| gwine-proton | Valve proton-experimental-bleeding-edge | fedora:43 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
+| gwine-proton | Valve proton-experimental-bleeding-edge | fedora:44 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
 
 ## Fichiers importants
 
@@ -37,7 +37,7 @@ Le presenter EVR de Wine a des bugs de recyclage de surfaces D3D9 et de race con
 
 - gwine/gwine-proton : déclenchement manuel (`workflow_dispatch`)
 - wine-tkg-git est cloné, configuré via sed, puis `non-makepkg-build.sh` est exécuté
-- Le dependency auto-resolver de wine-tkg est désactivé (`_nomakepkg_dependency_autoresolver="false"`) car les noms de packages sont obsolètes pour Fedora 43
+- Le dependency auto-resolver de wine-tkg est désactivé (`_nomakepkg_dependency_autoresolver="false"`) car les noms de packages sont obsolètes pour Fedora 43/44
 - Les releases sont des `.tar.xz` avec conservation des 3 dernières par variant
 
 ## Build local (Podman)
@@ -70,13 +70,13 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 
 **Pourquoi seulement sur gwine-proton :**
 - L'arbre Wine upstream (gwine) a winedmo et winegstreamer mais le `topology_loader` de mfplat est un **stub** — il ne connecte pas winedmo → winegstreamer. Résultat : les vidéos MF ne marchent pas, peu importe le bundling FFmpeg/gst-libav. Valve a implémenté le topology loader complet dans son arbre Proton uniquement.
-- gwine-proton utilise Fedora 43 → même glibc que le système cible (uBlue)
+- gwine-proton utilise Fedora 44 → même glibc/GLib que le système cible (uBlue)
 
 **FFmpeg est compilé en shared (.so)** avec les flags GE-Proton :
 - ~40 décodeurs (vc1, wmv1-3, h264, hevc, aac, mpeg4...)
 - swscale activé (requis pour la conversion pixel format)
 - Demuxers asf, xwma, matroska, mp4...
-- 32-bit et 64-bit compilés dans le container Fedora 43
+- 32-bit et 64-bit compilés dans le container Fedora 44
 - `.so` bundlés dans le package Wine avec `$ORIGIN` rpath
   - 32-bit → `lib/wine/i386-unix/` (libav*.so, libsw*.so)
   - 64-bit → `lib64/wine/x86_64-unix/` (libav*.so, libsw*.so)
@@ -124,9 +124,9 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Le `.so` FAudio bundlé et `--with-faudio` ont été retirés : inutiles pour gwine-proton (FAudio est builtin)
 - Portée : gwine-proton uniquement
 
-## Problèmes connus (Fedora 43 container)
+## Problèmes connus (Fedora 43/44 container)
 
-### Renommages de packages Fedora 43
+### Renommages de packages Fedora 43/44
 - `zlib-devel` → `zlib-ng-compat-devel` (zlib-ng transition)
 - `SDL2-devel` → `sdl2-compat-devel` (Fedora 43 SDL3 migration)
 - `vulkan-devel` → `vulkan-loader-devel` + `vulkan-headers`
@@ -135,7 +135,7 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - `wget` → `wget2`
 - `python-pefile` → `python3-pefile`
 
-### Packages supprimés de Fedora 43
+### Packages supprimés de Fedora 43/44
 - `fontpackages-devel` — obsolète
 - `mesa-libGLU-devel` — retiré de Fedora 43
 - `libpng-static.x86_64` — retiré
@@ -220,7 +220,7 @@ Le commit 879a479 de wine-tkg set `_lib32name="lib"` + `_lib64name="lib"` pour V
 
 Wine 11 ne set `OPENCL_LIBS` que sur macOS (`-framework OpenCL`), jamais sur Linux. Résultat : `opencl.so` est compilé mais linké sans `-lOpenCL` → `undefined reference to clGetPlatformInfo`. Le patch `opencl_linux_fix.mypatch` ajoute `AC_CHECK_LIB(OpenCL, clGetPlatformInfo)` dans le cas `*)` du `case $host_os` de `configure.ac`, set `OPENCL_LIBS="-lOpenCL"` si trouvé. wine-tkg exécute `autoreconf -fiv` après les userpatches, donc le `configure` est régénéré automatiquement.
 
-- `ocl-icd-devel` + `ocl-icd-devel.i686` installés dans le container Fedora 43 (Containerfile + CI)
+- `ocl-icd-devel` + `ocl-icd-devel.i686` installés dans le container Fedora 44 (Containerfile + CI)
 - Ne PAS ajouter `--without-opencl` dans les configure args (OpenCL est requis par certains émulateurs/games)
 - Portée : gwine-proton uniquement (gwine n'a pas le problème de build)
 

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     container:
-      image: fedora:43
+      image: fedora:44
 
     steps:
       - name: Checkout repository
@@ -102,7 +102,7 @@ jobs:
           FFMPEG32_PREFIX="/opt/ffmpeg32"
           export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
           export CFLAGS="-m32"
-          export LDFLAGS="-m32 -L/usr/lib"
+          export LDFLAGS="-m32 -L/usr/lib -Wl,-z,notext"
           ./configure \
             --prefix="${FFMPEG32_PREFIX}" \
             --libdir="${FFMPEG32_PREFIX}/lib" \
@@ -110,7 +110,7 @@ jobs:
             --target-os=linux \
             --arch=x86_32 \
             --host-cflags="-m32" \
-            --host-ldflags="-m32 -L/usr/lib"
+            --host-ldflags="-m32 -L/usr/lib -Wl,-z,notext"
           make -j$(nproc)
           make install
 
@@ -135,6 +135,7 @@ jobs:
           cd /tmp/gstreamer
 
           sed -i "s/have_sse41 = cc.has_argument(sse41_args) and host_machine.cpu_family() == 'x86_64'/have_sse41 = false/g" subprojects/gst-plugins-base/meson.build
+          sed -i 's/0\.0, 10\.0, DEFAULT_PROP_VOLUME,$/0.0, G_MAXDOUBLE, DEFAULT_PROP_VOLUME,/' subprojects/gst-plugins-base/gst/volume/gstvolume.c
           rm -f subprojects/openh264.wrap subprojects/vpx.wrap subprojects/libvmaf.wrap subprojects/glib.wrap
 
           mv /usr/lib64/glib-2.0/include/glibconfig.h /usr/lib64/glib-2.0/include/glibconfig.h.x64
