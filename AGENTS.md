@@ -36,6 +36,8 @@ Le presenter EVR de Wine a des bugs de recyclage de surfaces D3D9 et de race con
 ### Audio WMA — pop puis silence
 Jeux Unity utilisant `wmvcore` (Windows Media Audio, ex: Bubsy the Woolies Strike Back) : le son joue au démarrage puis s'arrête net avec un "pop". Le streaming WMA fonctionne partiellement — `WMReaderAdvanced_SetManualStreamSelection` est un stub (`fixme`) dans Wine. Le buffer audio se vide sans être réalimenté. Problème identique sandbox/non-sandbox, indépendant de GStreamer/pulseaudio. Bug Wine upstream, pas gwine-proton.
 
+**Workaround** : `winetricks wmp9` installe les DLLs natives Windows Media qui contournent winegstreamer pour le décodage WMA.
+
 ## Build
 
 - gwine/gwine-proton : déclenchement manuel (`workflow_dispatch`)
