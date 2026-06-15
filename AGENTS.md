@@ -171,6 +171,17 @@ Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 
 - test-build.sh : copie plugins+libs+scanner + `--set-rpath` (pas `--force-rpath` !) + rpath winegstreamer.so + `--no-cache` support
 - winegstreamer.so 32-bit : fix via les i686 transitive deps (libXdamage, libXtst, nettle, libmount, libselinux, libblkid, libatomic)
 
+### glvideoflip manquant — RÉSOLU (via graphene)
+
+**Symptôme** : jeux Unity 32-bit (ex: Bubsy the Woolies Strike Back) figent ~10s après le lancement. Erreur `winegstreamer: failed to create glvideoflip, are 32-bit GStreamer "base" plugins installed?`.
+
+**Cause racine** : dans `subprojects/gst-plugins-base/ext/gl/meson.build`, la compilation de `gstglvideoflip.c` est conditionnelle à `graphene_dep.found()`. La bibliothèque `graphene-devel` n'était pas installée dans le container → `glvideoflip` absent du plugin `opengl` → `gst_element_factory_make("glvideoflip", NULL)` retourne NULL → le pipeline vidéo OpenGL échoue → jeu figé.
+
+**Fix** :
+- `Containerfile` : ajout `graphene-devel` + `graphene-devel.i686`
+- `test-build.sh` + `build-gwine-proton.yml` : bundling `libgraphene-1.0.so*` dans `gst-libs/` 32+64-bit pour le runtime
+- Portée : gwine-proton uniquement (gwine n'utilise pas le pipeline vidéo OpenGL)
+
 ## winegstreamer NV12 buffer size mismatch — EN COURS
 
 **Symptôme** : vidéos H.264 (ex: Legend of Mana) affichent un écran noir, erreur en boucle :
