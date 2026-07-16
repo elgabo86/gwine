@@ -51,6 +51,7 @@ if [ -d /patches ]; then
   rm -f wine-tkg-userpatches/mpeg4_m4s2_decoder_fix.mypatch
   rm -f wine-tkg-userpatches/mfplat_buffer_stride_fix.mypatch
   rm -f wine-tkg-userpatches/disable_mediaconv_fallback.mypatch
+  rm -f wine-tkg-userpatches/cpuid_fault_handler.mypatch
   echo "Copied custom patches (removed proton-specific patches)"
 fi
 
