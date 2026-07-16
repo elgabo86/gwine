@@ -72,6 +72,13 @@ jobs:
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           ( yes | ./non-makepkg-build.sh ) || true
+          if ls -d non-makepkg-builds/wine-tkg* 1>/dev/null 2>&1; then
+            echo "Build directory found - build successful"
+          else
+            echo "::error::Build failed - no output directory found. Check prepare.log below."
+            find / -maxdepth 5 -name "prepare.log" -path "*/wine-tkg*" -exec cat {} \; 2>/dev/null || echo "prepare.log not found"
+            exit 1
+          fi
 
       - name: Show prepare.log on failure
         if: failure()

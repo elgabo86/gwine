@@ -1,7 +1,8 @@
-diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
---- a/dlls/ntdll/unix/signal_x86_64.c	2026-07-13 19:41:14.463326692 +0200
-+++ b/dlls/ntdll/unix/signal_x86_64.c	2026-07-13 19:40:12.038887452 +0200
-@@ -562,6 +562,14 @@
+diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
+index 110404c..f3aea6e 100644
+--- a/dlls/ntdll/unix/signal_x86_64.c
++++ b/dlls/ntdll/unix/signal_x86_64.c
+@@ -562,6 +562,14 @@ void set_process_instrumentation_callback( void *callback )
      server_leave_uninterrupted_section( &instrumentation_callback_mutex, &sigset );
  }
  
@@ -16,7 +17,7 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
  struct xcontext
  {
      CONTEXT c;
-@@ -2049,6 +2057,20 @@
+@@ -2049,6 +2057,20 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
      extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
      ucontext_t *ucontext = init_handler( sigcontext );
      struct syscall_frame *frame = get_syscall_frame();
@@ -37,7 +38,7 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
  
      TRACE_(seh)("SIGSYS, rax %#llx, rip %#llx.\n", RAX_sig(ucontext), RIP_sig(ucontext));
  
-@@ -2691,6 +2713,90 @@
+@@ -2683,6 +2705,90 @@ static inline BOOL check_invalid_gsbase( ucontext_t *ucontext )
      return TRUE;
  }
  
@@ -128,7 +129,7 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
  
  /**********************************************************************
   *		segv_handler
-@@ -2704,6 +2810,106 @@
+@@ -2696,6 +2802,106 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
      struct xcontext context;
      void *steamclient_addr = NULL;
  
@@ -235,7 +236,7 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
      rec.ExceptionAddress = (void *)RIP_sig(ucontext);
      save_context( &context, ucontext );
  
-@@ -3137,6 +3343,65 @@
+@@ -3129,6 +3335,65 @@ static void *mac_thread_gsbase(void)
  }
  #endif
  
@@ -301,7 +302,7 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
  
  /**********************************************************************
   *		signal_init_process
-@@ -3189,6 +3454,8 @@
+@@ -3181,6 +3446,8 @@ void signal_init_process(void)
      if (sigaction( SIGTRAP, &sig_act, NULL ) == -1) goto error;
      sig_act.sa_sigaction = segv_handler;
      if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
@@ -310,68 +311,14 @@ diff -ruN "dlls/ntdll/unix/signal_x86_64.c" dlls/ntdll/unix/signal_x86_64.c
      if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
      if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
  #ifdef __APPLE__
-
-diff -ruN "loader/wine.inf.in" loader/wine.inf.in
---- a/loader/wine.inf.in	2026-07-13 19:41:15.514044973 +0200
-+++ b/loader/wine.inf.in	2026-07-13 19:38:41.637778759 +0200
-@@ -1795,3 +1795,4 @@
- ;;Other app-specific overrides
- HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",4,
- HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",4,
-+HKLM,System\CurrentControlSet\Control\IDConfigDB\Hardware Profiles\0001,"HwProfileGuid",,"{12345678-1234-1234-1234-123456789012}"
-
-diff -ruN "server/fd.c" server/fd.c
---- a/server/fd.c	2026-07-13 19:41:15.368211756 +0200
-+++ b/server/fd.c	2026-07-13 19:38:41.638054059 +0200
-@@ -352,6 +352,8 @@
- timeout_t current_time;
- timeout_t monotonic_time;
- 
-+static timeout_t faketime = 0;
-+
- struct _KUSER_SHARED_DATA *user_shared_data = NULL;
- static const timeout_t user_shared_data_timeout = 16 * 10000;
- 
-@@ -433,7 +435,7 @@
-     static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
-     struct timeval now;
-     gettimeofday( &now, NULL );
--    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970;
-+    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970 - faketime;
-     monotonic_time = monotonic_counter();
-     if (user_shared_data) set_user_shared_data_time();
- }
-@@ -3357,3 +3359,9 @@
-         release_object( fd );
-     }
- }
-+
-+DECL_HANDLER(set_faketime)
-+{
-+    
-+    faketime = ((current_time >> 32) - req->faketime) << 32;
-+}
-
-diff -ruN "server/protocol.def" server/protocol.def
---- a/server/protocol.def	2026-07-13 19:41:14.457924676 +0200
-+++ b/server/protocol.def	2026-07-13 19:38:41.638419949 +0200
-@@ -4364,3 +4364,8 @@
-     unsigned int shm_idx;
- @REPLY
- @END
-+
-+@REQ(set_faketime)
-+    unsigned __int64 faketime;
-+@REPLY
-+@END
-
-diff -ruN "include/wine/server_protocol.h" include/wine/server_protocol.h
+diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+index d908717..e9eb701 100644
 --- a/include/wine/server_protocol.h
 +++ b/include/wine/server_protocol.h
-@@ -6159,6 +6159,15 @@
+@@ -6159,6 +6159,15 @@ struct d3dkmt_mutex_release_reply
      struct reply_header __header;
  };
-
+ 
 +struct set_faketime_request
 +{
 +    struct request_header __header;
@@ -381,18 +328,18 @@ diff -ruN "include/wine/server_protocol.h" include/wine/server_protocol.h
 +{
 +    struct reply_header __header;
 +};
-
+ 
  enum request
  {
-@@ -6468,6 +6477,7 @@
+@@ -6468,6 +6477,7 @@ enum request
      REQ_d3dkmt_object_open_name,
      REQ_d3dkmt_mutex_acquire,
      REQ_d3dkmt_mutex_release,
 +    REQ_set_faketime,
      REQ_NB_REQUESTS
  };
-
-@@ -6781,6 +6791,7 @@
+ 
+@@ -6781,6 +6791,7 @@ union generic_request
      struct d3dkmt_object_open_name_request d3dkmt_object_open_name_request;
      struct d3dkmt_mutex_acquire_request d3dkmt_mutex_acquire_request;
      struct d3dkmt_mutex_release_request d3dkmt_mutex_release_request;
@@ -400,22 +347,76 @@ diff -ruN "include/wine/server_protocol.h" include/wine/server_protocol.h
  };
  union generic_reply
  {
-@@ -7092,8 +7103,9 @@
+@@ -7092,8 +7103,9 @@ union generic_reply
      struct d3dkmt_object_open_name_reply d3dkmt_object_open_name_reply;
      struct d3dkmt_mutex_acquire_reply d3dkmt_mutex_acquire_reply;
      struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
 +    struct set_faketime_reply set_faketime_reply;
  };
-
+ 
 -#define SERVER_PROTOCOL_VERSION 930
 +#define SERVER_PROTOCOL_VERSION 931
-
+ 
  #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
-
-diff -ruN "server/request_handlers.h" server/request_handlers.h
+diff --git a/loader/wine.inf.in b/loader/wine.inf.in
+index 56e3af7..43a8963 100644
+--- a/loader/wine.inf.in
++++ b/loader/wine.inf.in
+@@ -1539,3 +1539,4 @@ HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
+ ;;Other app-specific overrides
+ HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",4,
+ HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",4,
++HKLM,System\CurrentControlSet\Control\IDConfigDB\Hardware Profiles\0001,"HwProfileGuid",,"{12345678-1234-1234-1234-123456789012}"
+diff --git a/server/fd.c b/server/fd.c
+index aa71e6d..cdad76c 100644
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -352,6 +352,8 @@ static struct list rel_timeout_list = LIST_INIT(rel_timeout_list); /* sorted rel
+ timeout_t current_time;
+ timeout_t monotonic_time;
+ 
++static timeout_t faketime = 0;
++
+ struct _KUSER_SHARED_DATA *user_shared_data = NULL;
+ static const timeout_t user_shared_data_timeout = 16 * 10000;
+ 
+@@ -433,7 +435,7 @@ void set_current_time(void)
+     static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
+     struct timeval now;
+     gettimeofday( &now, NULL );
+-    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970;
++    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970 - faketime;
+     monotonic_time = monotonic_counter();
+     if (user_shared_data) set_user_shared_data_time();
+ }
+@@ -3333,3 +3335,9 @@ DECL_HANDLER(set_fd_eof_info)
+         release_object( fd );
+     }
+ }
++
++DECL_HANDLER(set_faketime)
++{
++    
++    faketime = ((current_time >> 32) - req->faketime) << 32;
++}
+diff --git a/server/protocol.def b/server/protocol.def
+index ac38076..9862d55 100644
+--- a/server/protocol.def
++++ b/server/protocol.def
+@@ -4353,3 +4353,8 @@ enum fsync_type
+     unsigned int shm_idx;
+ @REPLY
+ @END
++
++@REQ(set_faketime)
++    unsigned __int64 faketime;
++@REPLY
++@END
+diff --git a/server/request_handlers.h b/server/request_handlers.h
+index 42eb7da..d5f702e 100644
 --- a/server/request_handlers.h
 +++ b/server/request_handlers.h
-@@ -313,6 +313,7 @@
+@@ -313,6 +313,7 @@ DECL_HANDLER(d3dkmt_share_objects);
  DECL_HANDLER(d3dkmt_object_open_name);
  DECL_HANDLER(d3dkmt_mutex_acquire);
  DECL_HANDLER(d3dkmt_mutex_release);
@@ -423,7 +424,7 @@ diff -ruN "server/request_handlers.h" server/request_handlers.h
  
  typedef void (*req_handler)( const void *req, void *reply );
  static const req_handler req_handlers[REQ_NB_REQUESTS] =
-@@ -623,6 +624,7 @@
+@@ -623,6 +624,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
      (req_handler)req_d3dkmt_object_open_name,
      (req_handler)req_d3dkmt_mutex_acquire,
      (req_handler)req_d3dkmt_mutex_release,

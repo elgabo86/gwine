@@ -58,6 +58,11 @@ fi
 sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
 
 ( yes | ./non-makepkg-build.sh ) || true
+if ! ls -d non-makepkg-builds/wine-tkg* 1>/dev/null 2>&1; then
+  echo "ERROR: Build failed - no output directory found. Check prepare.log:"
+  cat prepare.log 2>/dev/null || echo "prepare.log not found"
+  exit 1
+fi
 
 cd /build/wine-tkg-git/wine-tkg-git
 
