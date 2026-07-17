@@ -8,26 +8,21 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 
 | Variant | Base | Container CI | winedmo | Description |
 |---------|------|-------------|---------|-------------|
-| gwine | Wine mainline + staging | artixlinux/artixlinux:latest | Non (topology_loader stub) | Build Wine classique, pas de vidéo MF |
-| gwine-proton | Valve proton-experimental-bleeding-edge | fedora:44 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
+| gwine | Valve proton-experimental-bleeding-edge | fedora:44 | Oui (FFmpeg shared bundle) | Build basé sur l'arbre Valve avec winedmo pour la lecture vidéo |
 
 ## Fichiers importants
 
-- `.github/workflows/build-gwine.yml` — Workflow CI gwine + gwine-proton (`workflow_dispatch` uniquement)
+- `.github/workflows/build-gwine.yml` — Workflow CI gwine (`workflow_dispatch` uniquement)
 - `Containerfile` — Image Podman de base pour build local (deps + FFmpeg 32+64-bit + GStreamer 32+64-bit)
-- `test-build.sh` — Script de build local gwine-proton via Podman (output dans `/tmp/gwine-output/`)
-- `test-build-gwine.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
+- `test-build.sh` — Script de build local gwine via Podman (output dans `/tmp/gwine-output/`)
 - `patches/*.mypatch` — Patches personnalisés copiés dans wine-tkg-userpatches/
-  - `gamepad_axis_32bit_fix.mypatch` — Force axes 32-bit pour compat DirectInput (gwine uniquement, exclu de gwine-proton)
-  - `winegstreamer_nv12_buffer_fix.mypatch` — Fix buffer size mismatch NV12 dans winegstreamer (gwine-proton uniquement, exclu de gwine car topology_loader stub)
-  - `opencl_linux_fix.mypatch` — Ajoute `AC_CHECK_LIB(OpenCL,clGetPlatformInfo)` dans le cas `*)` de `configure.ac` pour que `OPENCL_LIBS="-lOpenCL"` soit set sur Linux (gwine-proton uniquement, exclu de gwine)
-  - `wmadec_getcurrenttype.mypatch` — Implémente `transform_GetInputCurrentType` et `transform_GetOutputCurrentType` dans `wma_decoder.c` (stub E_NOTIMPL → convertit DMO_MEDIA_TYPE en IMFMediaType via MFCreateMediaTypeFromRepresentation). Le stub E_NOTIMPL causait un crash quand la DLL native xaudio2_7 appelle GetInputCurrentType sur le MFT wmadec (null pointer deref). Portée : gwine + gwine-proton
-  - `disable_mediaconv_fallback.mypatch` — Désactive le fallback `use_mediaconv` dans `wg_parser.c` : "Proton video converter" est toujours skippé par `autoplug_select_cb`, pas de retry avec mediaconv si le 1er essai échoue. Sans ce patch, `protonvideoconverter` substitue la vidéo par un blank quand il n'y a pas de cache fozdb. Portée : gwine-proton uniquement
-  - `use_real_username.mypatch` — Remplace le `steamuser` hardcodé dans `GetUserNameA/GetUserNameW` de `dlls/advapi32/advapi.c` par l'API Wine standard qui lit `WINEUSERNAME` (set par wineserver depuis le vrai nom d'utilisateur Unix). Sans ce patch, le dossier utilisateur dans le prefix Wine s'appelle toujours `steamuser` au lieu du nom réel. Portée : gwine-proton uniquement (exclu de gwine)
-  - `content_sniffing_fallback.mypatch` — Ajoute le content sniffing dans `resolver_get_bytestream_handler` (`dlls/mfplat/main.c`) : quand ni extension de fichier ni MIME type ne sont disponibles, appelle `resolver_get_bytestream_url_hint` pour détecter le type via les magic bytes (MP4, ASF, WAV, MP3). Sans ce patch, les jeux qui utilisent des fichiers vidéo sans extension (ex: Legend of Mana) reçoivent `MF_E_UNSUPPORTED_BYTESTREAM_TYPE` et les cinématiques sont skippées. Portée : gwine-proton uniquement (exclu de gwine)
-  - `mpeg4_m4s2_decoder_fix.mypatch` — Ajoute le support du décodage MPEG-4 v2 Simple Profile (codec tag `M4S2`/`MP4V`/`MP4S`) dans winegstreamer : (1) `video_decoder.c` — ajoute `MFVideoFormat_M4S2`, `MFVideoFormat_MP4V`, `MFVideoFormat_MP4S` aux types d'entrée du `wmv_decoder` et met RGB32 en priorité dans les types de sortie ; (2) `wg_media_type.c` — ajoute `init_caps_from_video_mpeg4` pour mapper MF→Gst (`video/mpeg,mpegversion=4`) et gère le mapping inverse Gst→MF dans `caps_to_media_type` ; (3) `wmvdecod/wmvdecod.c` — ajoute `MFVideoFormat_M4S2`/`MP4V`/`MP4S`/`MP43` au `MFTRegister`. Sans ce patch, `MFTEnumEx` ne trouve pas de décodeur pour M4S2 → `MF_E_TOPO_CODEC_NOT_FOUND` (0xc00d5212). Portée : gwine-proton uniquement (exclu de gwine)
-  - `mfplat_buffer_stride_fix.mypatch` — Corrige le calcul de stride dans `dlls/mfplat/buffer.c` : `buffer->_2d.width` (largeur en pixels) était utilisé comme stride ET width en bytes dans `copy_image()`, incorrect pour les formats > 8 bpp. Utilise le vrai pitch à la place. Sans ce patch, `MFCopyImage` copie avec stride 1280 au lieu de 5120 pour du RGB32 → 75% des données perdues → image corrompue. Portée : gwine-proton uniquement (exclu de gwine)
-  - `cpuid_fault_handler.mypatch` — Ajoute la gestion du CPUID faulting dans le handler SIGSEGV de Wine (`dlls/ntdll/unix/signal_x86_64.c`) : interception des instructions CPUID quand le kernel émet un segfault via `ARCH_SET_CPUID`, spoofing des valeurs CPUID (vendor, features), patching de `KUSER_SHARED_DATA`, bypass syscall via registres XMM, et support `set_faketime` dans wineserver (`server/fd.c`, `server/protocol.def`, `server/request_handlers.h`, `include/wine/server_protocol.h`). Ajoute aussi un GUID de profil hardware dans `loader/wine.inf.in`. Portée : gwine-proton uniquement (exclu de gwine)
+  - `wmadec_getcurrenttype.mypatch` — Implémente `transform_GetInputCurrentType` et `transform_GetOutputCurrentType` dans `wma_decoder.c` (stub E_NOTIMPL → convertit DMO_MEDIA_TYPE en IMFMediaType via MFCreateMediaTypeFromRepresentation). Le stub E_NOTIMPL causait un crash quand la DLL native xaudio2_7 appelle GetInputCurrentType sur le MFT wmadec (null pointer deref). Portée : gwine
+  - `disable_mediaconv_fallback.mypatch` — Désactive le fallback `use_mediaconv` dans `wg_parser.c` : "Proton video converter" est toujours skippé par `autoplug_select_cb`, pas de retry avec mediaconv si le 1er essai échoue. Sans ce patch, `protonvideoconverter` substitue la vidéo par un blank quand il n'y a pas de cache fozdb. Portée : gwine uniquement
+  - `use_real_username.mypatch` — Remplace le `steamuser` hardcodé dans `GetUserNameA/GetUserNameW` de `dlls/advapi32/advapi.c` par l'API Wine standard qui lit `WINEUSERNAME` (set par wineserver depuis le vrai nom d'utilisateur Unix). Sans ce patch, le dossier utilisateur dans le prefix Wine s'appelle toujours `steamuser` au lieu du nom réel. Portée : gwine uniquement
+  - `content_sniffing_fallback.mypatch` — Ajoute le content sniffing dans `resolver_get_bytestream_handler` (`dlls/mfplat/main.c`) : quand ni extension de fichier ni MIME type ne sont disponibles, appelle `resolver_get_bytestream_url_hint` pour détecter le type via les magic bytes (MP4, ASF, WAV, MP3). Sans ce patch, les jeux qui utilisent des fichiers vidéo sans extension (ex: Legend of Mana) reçoivent `MF_E_UNSUPPORTED_BYTESTREAM_TYPE` et les cinématiques sont skippées. Portée : gwine uniquement
+  - `mpeg4_m4s2_decoder_fix.mypatch` — Ajoute le support du décodage MPEG-4 v2 Simple Profile (codec tag `M4S2`/`MP4V`/`MP4S`) dans winegstreamer : (1) `video_decoder.c` — ajoute `MFVideoFormat_M4S2`, `MFVideoFormat_MP4V`, `MFVideoFormat_MP4S` aux types d'entrée du `wmv_decoder` et met RGB32 en priorité dans les types de sortie ; (2) `wg_media_type.c` — ajoute `init_caps_from_video_mpeg4` pour mapper MF→Gst (`video/mpeg,mpegversion=4`) et gère le mapping inverse Gst→MF dans `caps_to_media_type` ; (3) `wmvdecod/wmvdecod.c` — ajoute `MFVideoFormat_M4S2`/`MP4V`/`MP4S`/`MP43` au `MFTRegister`. Sans ce patch, `MFTEnumEx` ne trouve pas de décodeur pour M4S2 → `MF_E_TOPO_CODEC_NOT_FOUND` (0xc00d5212). Portée : gwine uniquement
+  - `mfplat_buffer_stride_fix.mypatch` — Corrige le calcul de stride dans `dlls/mfplat/buffer.c` : `buffer->_2d.width` (largeur en pixels) était utilisé comme stride ET width en bytes dans `copy_image()`, incorrect pour les formats > 8 bpp. Utilise le vrai pitch à la place. Sans ce patch, `MFCopyImage` copie avec stride 1280 au lieu de 5120 pour du RGB32 → 75% des données perdues → image corrompue. Portée : gwine uniquement
+  - `cpuid_fault_handler.mypatch` — Ajoute la gestion du CPUID faulting dans le handler SIGSEGV de Wine (`dlls/ntdll/unix/signal_x86_64.c`) : interception des instructions CPUID quand le kernel émet un segfault via `ARCH_SET_CPUID`, spoofing des valeurs CPUID (vendor, features), patching de `KUSER_SHARED_DATA`, bypass syscall via registres XMM, et support `set_faketime` dans wineserver (`server/fd.c`, `server/protocol.def`, `server/request_handlers.h`, `include/wine/server_protocol.h`). Ajoute aussi un GUID de profil hardware dans `loader/wine.inf.in`. Portée : gwine uniquement
 
 ## Problèmes connus
 
@@ -35,28 +30,28 @@ gwine est un build personnalisé de Wine construit via wine-tkg-git (Frogging-Fa
 Le presenter EVR de Wine a des bugs de recyclage de surfaces D3D9 et de race condition avec le streaming thread. Les vidéos M4S2 (Catherine Classic) sont décodées correctement grâce aux patches ci-dessus, mais l'affichage peut être noir/blanc/scintillant de façon non-déterministe (~50% de réussite). Le problème vient du `IDirect3DDevice9` partagé entre DXVK et l'allocateur de samples EVR. Un fix upstream est nécessaire dans `dlls/evr/presenter.c` et `dlls/mfplat/buffer.c`.
 
 ### Audio WMA — pop puis silence
-Jeux Unity utilisant `wmvcore` (Windows Media Audio, ex: Bubsy the Woolies Strike Back) : le son joue au démarrage puis s'arrête net avec un "pop". Le streaming WMA fonctionne partiellement — `WMReaderAdvanced_SetManualStreamSelection` est un stub (`fixme`) dans Wine. Le buffer audio se vide sans être réalimenté. Problème identique sandbox/non-sandbox, indépendant de GStreamer/pulseaudio. Bug Wine upstream, pas gwine-proton.
+Jeux Unity utilisant `wmvcore` (Windows Media Audio, ex: Bubsy the Woolies Strike Back) : le son joue au démarrage puis s'arrête net avec un "pop". Le streaming WMA fonctionne partiellement — `WMReaderAdvanced_SetManualStreamSelection` est un stub (`fixme`) dans Wine. Le buffer audio se vide sans être réalimenté. Problème identique sandbox/non-sandbox, indépendant de GStreamer/pulseaudio. Bug Wine upstream, pas gwine.
 
 **Workaround** : `winetricks wmp9` installe les DLLs natives Windows Media qui contournent winegstreamer pour le décodage WMA.
 
 ## Build
 
-- gwine/gwine-proton : déclenchement manuel (`workflow_dispatch`)
+- gwine : déclenchement manuel (`workflow_dispatch`)
+- Le build unique est basé sur l'arbre Valve Proton (ex-gwine-proton). La variante Wine standard (mainline) n'est plus maintenue.
 - wine-tkg-git est cloné, configuré via sed, puis `non-makepkg-build.sh` est exécuté
 - Le dependency auto-resolver de wine-tkg est désactivé (`_nomakepkg_dependency_autoresolver="false"`) car les noms de packages sont obsolètes pour Fedora 43/44
-- Les releases sont des `.tar.xz` avec conservation des 3 dernières par variant
+- Les releases sont des `.tar.xz` avec conservation des 3 dernières
 
 ## Build local (Podman)
 
 L'image de base `gwine-build` contient les deps + FFmpeg + GStreamer (cachée après le 1er build).
 
 ```bash
-bash test-build.sh                # gwine-proton
-bash test-build.sh --no-cache     # gwine-proton (rebuild image sans cache)
-bash test-build-gwine.sh          # gwine
+bash test-build.sh                # gwine
+bash test-build.sh --no-cache     # gwine (rebuild image sans cache)
 ```
 
-L'output va dans `/tmp/gwine-output/gwine-proton-{timestamp}/` (ou `gwine-{timestamp}/`), avec un symlink `*-latest` vers la plus récente.
+L'output va dans `/tmp/gwine-output/gwine-{timestamp}/`, avec un symlink `*-latest` vers la plus récente.
 
 **Notes techniques :**
 - `podman run -i` requis pour passer le script via heredoc stdin
@@ -74,9 +69,9 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Si winegstreamer ne trouve pas de plugins GStreamer → erreur `GStreamer doesn't support H.264 decoding`
 - **Solution** : bundler `gst-libav` (plugin GStreamer qui wrappe FFmpeg) compilé contre notre FFmpeg custom
 
-**Pourquoi seulement sur gwine-proton :**
-- L'arbre Wine upstream (gwine) a winedmo et winegstreamer mais le `topology_loader` de mfplat est un **stub** — il ne connecte pas winedmo → winegstreamer. Résultat : les vidéos MF ne marchent pas, peu importe le bundling FFmpeg/gst-libav. Valve a implémenté le topology loader complet dans son arbre Proton uniquement.
-- gwine-proton utilise Fedora 44 → même glibc/GLib que le système cible (uBlue)
+**Pourquoi gwine utilise winedmo :**
+- L'arbre Wine Valve a winedmo et winegstreamer avec le `topology_loader` complet de mfplat — il connecte winedmo → winegstreamer pour le décodage vidéo MF. Le Wine upstream a un `topology_loader` **stub** qui ne connecte pas ces composants.
+- gwine utilise Fedora 44 → même glibc/GLib que le système cible (uBlue)
 
 **FFmpeg est compilé en shared (.so)** avec les flags GE-Proton :
 - ~40 décodeurs (vc1, wmv1-3, h264, hevc, aac, mpeg4...)
@@ -93,7 +88,7 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 **Pourquoi PAS de rpath `$ORIGIN` sur winedmo.so :**
 - winedmo.so link dynamiquement contre libav*.so.62. Avec `$ORIGIN` rpath, winedmo trouve les FFmpeg .so bundlés → winedmo charge → le topology loader MF l'utilise comme démuxeur
 - Problème : quand winedmo charge, le builtin FAudio (xaudio2_7) tente le décodage WMA via `FAudio_WMADEC_init()` → `CoCreateInstance(&CLSID_CWMADecMediaObject)` → wmadec via winegstreamer. La négociation de output type échoue → `FAudio_assert(!FAILED(hr))` → **crash** (abort ou null pointer deref)
-- Sans `$ORIGIN` rpath : winedmo.so ne trouve pas FFmpeg → échoue à charger → `winedmo_demuxer_check()` retourne une erreur → la media source bascule sur `GStreamerByteStreamHandler` (winegstreamer) pour le démultiplexage ET le décodage → vidéo et audio WMA fonctionnent (comme dans gwine-proton 10)
+- Sans `$ORIGIN` rpath : winedmo.so ne trouve pas FFmpeg → échoue à charger → `winedmo_demuxer_check()` retourne une erreur → la media source bascule sur `GStreamerByteStreamHandler` (winegstreamer) pour le démultiplexage ET le décodage → vidéo et audio WMA fonctionnent (comme dans gwine 10)
 - Les FFmpeg .so bundlés restent nécessaires pour gst-libav (rpath → `$ORIGIN/../../wine/x86_64-unix` etc.)
 - `--with-ffmpeg` reste dans les configure args : Wine compile winedmo avec le support FFmpeg, mais winedmo ne trouvera pas les .so au runtime → fallback GStreamer
 
@@ -120,15 +115,15 @@ winedmo est le backend MF basé sur FFmpeg (MR Wine !6442, patchset Valve-only).
 - Le patch `disable_mediaconv_fallback.mypatch` désactive ce fallback : "Proton video converter" est toujours skippé, pas de retry avec `use_mediaconv=true`
 - Conséquence : si le 1er essai (decodebin normal) échoue, la vidéo ne joue pas au lieu d'être substituée par un blank
 - Les variables MEDIACONV_* et STEAM_COMPAT_TRANSCODED_MEDIA_PATH ne sont PAS settées dans le launcher — les éléments protonmediaconverter ne peuvent pas fonctionner sans
-- Portée : gwine-proton uniquement
+- Portée : gwine
 
 **FAudio** (XAudio reimplementation) :
 - Wine 11 (arbre Valve) a FAudio **builtin dans les PE DLLs** (xaudio2_*.dll, xactengine*.dll, x3daudio*.dll) — pas de `.so` externe
 - Le builtin FAudio utilise `FAudio_INTERNAL_DecodeWMAMF` → Media Foundation → winedmo/FFmpeg pour le décodage WMA, mais cette chaîne ne fonctionne pas pour XAudio2
 - **Workaround** : installer `xact` + `xact64` via winetricks (DLLs natives Microsoft avec décodeur WMA intégré)
 - gwine (mainline) : FAudio est un `.so` séparé linkant contre GStreamer → WMA marche via gst-libav système → pas de workaround nécessaire
-- Le `.so` FAudio bundlé et `--with-faudio` ont été retirés : inutiles pour gwine-proton (FAudio est builtin)
-- Portée : gwine-proton uniquement
+- Le `.so` FAudio bundlé et `--with-faudio` ont été retirés : inutiles pour gwine (FAudio est builtin)
+- Portée : gwine
 
 ## Problèmes connus (Fedora 43/44 container)
 
@@ -185,8 +180,8 @@ Wine's `configure` **override `PKG_CONFIG_LIBDIR`** pour le build 32-bit (ligne 
 
 **Fix** :
 - `Containerfile` : ajout `graphene-devel` + `graphene-devel.i686`
-- `test-build.sh` + `build-gwine-proton.yml` : bundling `libgraphene-1.0.so*` dans `gst-libs/` 32+64-bit pour le runtime
-- Portée : gwine-proton uniquement (gwine n'utilise pas le pipeline vidéo OpenGL)
+- `test-build.sh` + `build-gwine.yml` : bundling `libgraphene-1.0.so*` dans `gst-libs/` 32+64-bit pour le runtime
+- Portée : gwine
 
 ## winegstreamer NV12 buffer size mismatch — EN COURS
 
@@ -206,7 +201,7 @@ Le bug est côté **input** (push des données encodées dans le pipeline GStrea
 
 **Statut** : patch créé, s'applique proprement (0 fuzz) sur l'arbre Valve bleeding-edge. SELinux `:z` fix appliqué. **En attente de validation runtime**. Le patch contient un marqueur debug `[NV12 fix applied]` pour confirmer son application dans les logs.
 
-**Portée** : gwine-proton (CI + local). Exclu de gwine (le topology_loader mfplat est un stub, pas de vidéo MF).
+**Portée** : gwine (CI + local).
 
 **Note sur les patches wine-tkg** : `patch -Np1` rejette silencieusement les hunks avec fuzz > 0 quand exécuté dans un pipe `yes |`. Toujours vérifier avec `patch -p1 --dry-run` sur un clone de l'arbre cible. Générer le patch via `git diff` garantit un contexte exact.
 
@@ -228,7 +223,7 @@ Wine 11 ne set `OPENCL_LIBS` que sur macOS (`-framework OpenCL`), jamais sur Lin
 
 - `ocl-icd-devel` + `ocl-icd-devel.i686` installés dans le container Fedora 44 (Containerfile + CI)
 - Ne PAS ajouter `--without-opencl` dans les configure args (OpenCL est requis par certains émulateurs/games)
-- Portée : gwine-proton uniquement (gwine n'a pas le problème de build)
+- Portée : gwine
 
 ## ICU 68 DLLs — RÉSOLU (via bundling)
 
@@ -238,15 +233,15 @@ Wine 11 (arbre Valve) fournit `icu.dll` comme DLL de forwarding vers `icuuc68.dl
 - 64-bit (`icuuc68.dll`, `icuin68.dll`, `icudt68.dll`) → `lib64/wine/x86_64-windows/`
 - 32-bit (`icuuc68.dll`, `icuin68.dll`, `icudt68.dll`) → `lib/wine/i386-windows/`
 - Source : `https://github.com/unicode-org/icu/releases/download/release-68_2/`
-- Portée : gwine-proton uniquement
+- Portée : gwine
 
 ## Conventions de commits
 
 Format : `[variant] type: message`
 
-- variant : `gwine`, `gwine-proton`, ou `all`
+- variant : `gwine` ou `all`
 - type : `feat`, `fix`, `chore`, `ci`
-- Exemples : `[gwine-proton] feat: add FFmpeg build for winedmo`, `[all] fix: correct rpath on winedmo.so`
+- Exemples : `[gwine] feat: add FFmpeg build for winedmo`, `[all] fix: correct rpath on winedmo.so`
 
 ## patchelf --force-rpath : NE JAMAIS utiliser sur winegstreamer.so
 

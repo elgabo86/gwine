@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 IMAGE_NAME="gwine-build"
-OUTPUT_DIR="/tmp/gwine-output"
+OUTPUT_DIR="${XDG_DOWNLOAD_DIR:-$(xdg-user-dir DOWNLOAD 2>/dev/null || echo "$HOME/Downloads")}/gwine-output"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 PODMAN_BUILD_FLAGS=""
 
@@ -47,7 +47,6 @@ sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/' win
 
 if [ -d /patches ]; then
   cp /patches/*.mypatch wine-tkg-userpatches/ 2>/dev/null || true
-  rm -f wine-tkg-userpatches/gamepad_axis_32bit_fix.mypatch
   echo "=== Copied custom patches to wine-tkg-userpatches/ ==="
   ls -la wine-tkg-userpatches/*.mypatch 2>/dev/null || echo "(no .mypatch files found after cp)"
 fi
@@ -86,7 +85,7 @@ else
 fi
 
 VERSION=$(basename "$BUILD_DIR" | sed 's/^wine-tkg[^0-9]*//')
-DEST="gwine-proton-${VERSION:-unknown}"
+DEST="gwine-${VERSION:-unknown}"
 
 cp -a "$BUILD_DIR" "/build/${DEST}"
 
@@ -179,7 +178,7 @@ for f in "${UNIX32}/"winedmo.so; do patchelf --set-rpath "\$ORIGIN" "$f" 2>/dev/
 cp -a /opt/icu68/win64/*.dll "${PE64}/" 2>/dev/null || true
 cp -a /opt/icu68/win32/*.dll "${PE32}/" 2>/dev/null || true
 
-mv "/build/${DEST}" "/output/gwine-proton-${TIMESTAMP}"
-ln -sfn "gwine-proton-${TIMESTAMP}" "/output/gwine-proton-latest"
-echo "=== Build done: /output/gwine-proton-${TIMESTAMP} ==="
+mv "/build/${DEST}" "/output/gwine-${TIMESTAMP}"
+ln -sfn "gwine-${TIMESTAMP}" "/output/gwine-latest"
+echo "=== Build done: /output/gwine-${TIMESTAMP} ==="
 CONTAINER_SCRIPT
