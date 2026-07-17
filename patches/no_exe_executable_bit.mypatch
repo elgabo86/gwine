@@ -1,0 +1,20 @@
+diff --git a/server/file.c b/server/file.c
+index 55f304e..0380cd3 100644
+--- a/server/file.c
++++ b/server/file.c
+@@ -240,8 +240,13 @@ static struct object *create_file_obj( struct fd *fd, unsigned int access, mode_
+ 
+ int is_file_executable( const char *name )
+ {
+-    int len = strlen( name );
+-    return len >= 4 && (!strcasecmp( name + len - 4, ".exe") || !strcasecmp( name + len - 4, ".com" ));
++    /* Gablue: never propagate the Unix executable bit to .exe/.com files.
++     * The +x bit makes KDE (KIO) treat them as native binaries: double-click
++     * shows an "Execute" dialog instead of opening them with the default
++     * Windows handler (gwine). Direct execution from a shell is handled by
++     * a binfmt_misc rule on the Gablue side instead. */
++    (void)name;
++    return 0;
+ }
+ 
+ #ifdef HAVE_SYS_EXTATTR_H
