@@ -206,13 +206,20 @@ jobs:
         run: |
           if [ -d "$GITHUB_WORKSPACE/patches" ]; then
             cp "$GITHUB_WORKSPACE/patches"/*.mypatch wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/ 2>/dev/null || true
+            # faketime est appliqué après staging via apply-faketime.py (pas en userpatch)
+            rm -f wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/faketime.mypatch
+            mkdir -p /patches
+            cp "$GITHUB_WORKSPACE/patches/apply-faketime.py" /patches/
             echo "Copied custom patches"
+            ls -la wine-tkg-git/wine-tkg-git/wine-tkg-userpatches/
           fi
 
       - name: Start build
         working-directory: /home/runner/work/wine-tkg-git/wine-tkg-git/
         run: |
           sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
+          # Injecter apply-faketime.py avant make_requests (modifie protocol.def → régénéré par make_requests)
+          sed -i '/tools\/make_requests/i /usr/bin/python3 /patches/apply-faketime.py "$_sourcedir" || echo "faketime: partial apply OK"' wine-tkg-scripts/prepare.sh
           ( yes | ./non-makepkg-build.sh ) || true
           if ls -d non-makepkg-builds/wine-tkg* 1>/dev/null 2>&1; then
             echo "Build directory found - build successful"
