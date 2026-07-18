@@ -90,7 +90,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +    *(UINT8*)(kuser + 0x295) = 0x0;    // Disable RDPID support
 +    *(UINT8*)(kuser + 0x297) = 0x0;    // Disable RDRAND support
 +
-+    if (getenv("PROTON_AVX") == NULL || (getenv("PROTON_AVX") != NULL && strcmp(getenv("PROTON_AVX"), "1")) != 0){
++    if (getenv("GWINE_NO_AVX") != NULL){
 +        // XSAVE related stuff
 +        *(UINT8*)(kuser + 0x285) = 0x0;    // Disable XSAVE support
 +        *(UINT8*)(kuser + 0x29B) = 0x0;    // Disable AVX support
@@ -242,8 +242,8 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +// Function to detect CPU vendor at startup
 +static void detect_cpu_vendor(void) {
 +    unsigned int eax, ebx, ecx, edx;
-+    int avx = 0;
-+    if (getenv("PROTON_AVX") != NULL && strcmp(getenv("PROTON_AVX"), "1") == 0) avx = 1;
++    int avx = 1;
++    if (getenv("GWINE_NO_AVX") != NULL) avx = 0;
 +    
 +    // Try to get CPUID(0) to detect vendor
 +    __asm__ volatile(
