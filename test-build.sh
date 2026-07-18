@@ -47,11 +47,17 @@ sed -i 's/_user_patches_no_confirm="false"/_user_patches_no_confirm="true"/' win
 
 if [ -d /patches ]; then
   cp /patches/*.mypatch wine-tkg-userpatches/ 2>/dev/null || true
+  # faketime est appliqué après staging via apply-faketime.py
+  rm -f wine-tkg-userpatches/faketime.mypatch
   echo "=== Copied custom patches to wine-tkg-userpatches/ ==="
   ls -la wine-tkg-userpatches/*.mypatch 2>/dev/null || echo "(no .mypatch files found after cp)"
 fi
 
 sed -i 's|_configure_args32+=(--libdir="$_prefix/$_lib32name")|_configure_args32+=(--libdir="$_prefix/$_lib64name")|' non-makepkg-build.sh
+
+# Injecter apply-faketime.py avant make_requests (modifie protocol.def → régénéré par make_requests)
+# La fonction _prepare() est dans wine-tkg-scripts/prepare.sh
+sed -i '/tools\/make_requests/i /usr/bin/python3 /patches/apply-faketime.py "$_sourcedir" || echo "faketime: partial apply OK"' wine-tkg-scripts/prepare.sh
 
 ( yes | ./non-makepkg-build.sh ) || true
 if ! ls -d non-makepkg-builds/wine-tkg* 1>/dev/null 2>&1; then

@@ -1,7 +1,8 @@
 diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
---- a/dlls/ntdll/unix/signal_x86_64.c	2026-07-16 21:51:10.396860414 +0200
-+++ b/dlls/ntdll/unix/signal_x86_64.c	2026-07-16 21:51:54.029850452 +0200
-@@ -562,6 +562,14 @@
+index 110404c274c..ce0457189aa 100644
+--- a/dlls/ntdll/unix/signal_x86_64.c
++++ b/dlls/ntdll/unix/signal_x86_64.c
+@@ -562,6 +562,16 @@ void set_process_instrumentation_callback( void *callback )
      server_leave_uninterrupted_section( &instrumentation_callback_mutex, &sigset );
  }
  
@@ -12,11 +13,13 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +static unsigned int spoof_leaf40000000_eax, spoof_leaf40000000_ebx, spoof_leaf40000000_ecx, spoof_leaf40000000_edx;
 +static unsigned int spoof_leaf40000001_eax, spoof_leaf40000001_ebx, spoof_leaf40000001_ecx, spoof_leaf40000001_edx;
 +static unsigned int spoof_leaf1_eax, spoof_leaf1_ebx, spoof_leaf1_ecx, spoof_leaf1_edx;
++static unsigned int spoof_leaf1_ecx_noavx;
++static int need_avx_off = 0;
 +
  struct xcontext
  {
      CONTEXT c;
-@@ -2049,6 +2057,20 @@
+@@ -2049,6 +2059,20 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
      extern const void *__wine_syscall_dispatcher_prolog_end_ptr;
      ucontext_t *ucontext = init_handler( sigcontext );
      struct syscall_frame *frame = get_syscall_frame();
@@ -37,7 +40,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
  
      TRACE_(seh)("SIGSYS, rax %#llx, rip %#llx.\n", RAX_sig(ucontext), RIP_sig(ucontext));
  
-@@ -2683,6 +2705,90 @@
+@@ -2683,6 +2707,90 @@ static inline BOOL check_invalid_gsbase( ucontext_t *ucontext )
      return TRUE;
  }
  
@@ -90,7 +93,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +    *(UINT8*)(kuser + 0x295) = 0x0;    // Disable RDPID support
 +    *(UINT8*)(kuser + 0x297) = 0x0;    // Disable RDRAND support
 +
-+    if (getenv("GWINE_NO_AVX") != NULL){
++    if (getenv("GWINE_NO_AVX") != NULL || need_avx_off){
 +        // XSAVE related stuff
 +        *(UINT8*)(kuser + 0x285) = 0x0;    // Disable XSAVE support
 +        *(UINT8*)(kuser + 0x29B) = 0x0;    // Disable AVX support
@@ -128,7 +131,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
  
  /**********************************************************************
   *		segv_handler
-@@ -2696,6 +2802,106 @@
+@@ -2696,6 +2804,108 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
      struct xcontext context;
      void *steamclient_addr = NULL;
  
@@ -189,6 +192,8 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +            case 0x336933:
 +                MESSAGE("Spoofing CPUID leaf %x\n", leaf);
 +                TargetSysHandler = uc->uc_mcontext.gregs[REG_RCX];
++                need_avx_off = 1;
++                spoof_leaf1_ecx = spoof_leaf1_ecx_noavx;
 +                patch_kuser_shared_data();
 +                uc->uc_mcontext.gregs[REG_RAX] = 0x0;
 +                uc->uc_mcontext.gregs[REG_RBX] = 0x0;
@@ -235,7 +240,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
      rec.ExceptionAddress = (void *)RIP_sig(ucontext);
      save_context( &context, ucontext );
  
-@@ -3129,6 +3335,65 @@
+@@ -3129,6 +3339,67 @@ static void *mac_thread_gsbase(void)
  }
  #endif
  
@@ -260,6 +265,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +        // Set Intel-specific spoofed values
 +        spoof_leaf1_eax = 0x000A0655;
 +        spoof_leaf1_ebx = 0x00200800;
++        spoof_leaf1_ecx_noavx = 0x01FAEBFF;
 +        if (avx) {
 +        	spoof_leaf1_ecx = 0x7BFAFBFF;
 +        } else spoof_leaf1_ecx = 0x01FAEBFF;
@@ -281,6 +287,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
 +        // Set AMD-specific spoofed values
 +        spoof_leaf1_eax = 0x00A20F12;
 +        spoof_leaf1_ebx = 0x00100800;
++        spoof_leaf1_ecx_noavx = 0x00F8220B;
 +        if (avx) {
 +        	spoof_leaf1_ecx = 0x7AD8320B;
 +        } else spoof_leaf1_ecx = 0x00F8220B;
@@ -301,7 +308,7 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
  
  /**********************************************************************
   *		signal_init_process
-@@ -3181,6 +3446,8 @@
+@@ -3181,6 +3452,8 @@ void signal_init_process(void)
      if (sigaction( SIGTRAP, &sig_act, NULL ) == -1) goto error;
      sig_act.sa_sigaction = segv_handler;
      if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
@@ -310,121 +317,3 @@ diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
      if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
      if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
  #ifdef __APPLE__
-
-diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
---- a/include/wine/server_protocol.h	2026-07-16 21:51:14.305175946 +0200
-+++ b/include/wine/server_protocol.h	2026-07-16 21:52:18.907982757 +0200
-@@ -6263,6 +6263,15 @@
-     struct reply_header __header;
- };
- 
-+struct set_faketime_request
-+{
-+    struct request_header __header;
-+    unsigned __int64 faketime;
-+};
-+struct set_faketime_reply
-+{
-+    struct reply_header __header;
-+};
- 
- enum request
- {
-@@ -6575,6 +6584,7 @@
-     REQ_d3dkmt_object_open_name,
-     REQ_d3dkmt_mutex_acquire,
-     REQ_d3dkmt_mutex_release,
-+    REQ_set_faketime,
-     REQ_fsync_free_shm_idx,
-     REQ_NB_REQUESTS
- };
-@@ -6892,6 +6902,7 @@
-     struct d3dkmt_object_open_name_request d3dkmt_object_open_name_request;
-     struct d3dkmt_mutex_acquire_request d3dkmt_mutex_acquire_request;
-     struct d3dkmt_mutex_release_request d3dkmt_mutex_release_request;
-+    struct set_faketime_request set_faketime_request;
-     struct fsync_free_shm_idx_request fsync_free_shm_idx_request;
- };
- union generic_reply
-@@ -7207,6 +7218,7 @@
-     struct d3dkmt_object_open_name_reply d3dkmt_object_open_name_reply;
-     struct d3dkmt_mutex_acquire_reply d3dkmt_mutex_acquire_reply;
-     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
-+    struct set_faketime_reply set_faketime_reply;
-     struct fsync_free_shm_idx_reply fsync_free_shm_idx_reply;
- };
- 
-
-diff --git a/server/request_handlers.h b/server/request_handlers.h
---- a/server/request_handlers.h	2026-07-16 21:51:14.308341279 +0200
-+++ b/server/request_handlers.h	2026-07-16 21:52:18.912162358 +0200
-@@ -316,6 +316,7 @@
- DECL_HANDLER(d3dkmt_object_open_name);
- DECL_HANDLER(d3dkmt_mutex_acquire);
- DECL_HANDLER(d3dkmt_mutex_release);
-+DECL_HANDLER(set_faketime);
- DECL_HANDLER(fsync_free_shm_idx);
- 
- typedef void (*req_handler)( const void *req, void *reply );
-@@ -630,6 +631,7 @@
-     (req_handler)req_d3dkmt_object_open_name,
-     (req_handler)req_d3dkmt_mutex_acquire,
-     (req_handler)req_d3dkmt_mutex_release,
-+    (req_handler)req_set_faketime,
-     (req_handler)req_fsync_free_shm_idx,
- };
- 
-
-diff --git a/loader/wine.inf.in b/loader/wine.inf.in
---- a/loader/wine.inf.in	2026-07-16 21:51:13.230231545 +0200
-+++ b/loader/wine.inf.in	2026-07-16 21:51:54.030469117 +0200
-@@ -1583,3 +1583,4 @@
- ;;Other app-specific overrides
- HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",4,
- HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",4,
-+HKLM,System\CurrentControlSet\Control\IDConfigDB\Hardware Profiles\0001,"HwProfileGuid",,"{12345678-1234-1234-1234-123456789012}"
-
-diff --git a/server/fd.c b/server/fd.c
---- a/server/fd.c	2026-07-16 21:51:13.247871416 +0200
-+++ b/server/fd.c	2026-07-16 21:51:54.030583526 +0200
-@@ -352,6 +352,8 @@
- timeout_t current_time;
- timeout_t monotonic_time;
- 
-+static timeout_t faketime = 0;
-+
- struct _KUSER_SHARED_DATA *user_shared_data = NULL;
- static const timeout_t user_shared_data_timeout = 16 * 10000;
- 
-@@ -433,7 +435,7 @@
-     static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
-     struct timeval now;
-     gettimeofday( &now, NULL );
--    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970;
-+    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970 - faketime;
-     monotonic_time = monotonic_counter();
-     if (user_shared_data) set_user_shared_data_time();
- }
-@@ -3357,3 +3359,9 @@
-         release_object( fd );
-     }
- }
-+
-+DECL_HANDLER(set_faketime)
-+{
-+    
-+    faketime = ((current_time >> 32) - req->faketime) << 32;
-+}
-
-diff --git a/server/protocol.def b/server/protocol.def
---- a/server/protocol.def	2026-07-16 21:51:11.890842747 +0200
-+++ b/server/protocol.def	2026-07-16 21:51:54.030750885 +0200
-@@ -4353,3 +4353,8 @@
-     unsigned int shm_idx;
- @REPLY
- @END
-+
-+@REQ(set_faketime)
-+    unsigned __int64 faketime;
-+@REPLY
-+@END

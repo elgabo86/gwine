@@ -1,0 +1,120 @@
+diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+index d9087179099..9ed7a7f4800 100644
+--- a/include/wine/server_protocol.h
++++ b/include/wine/server_protocol.h
+@@ -6160,6 +6160,17 @@ struct d3dkmt_mutex_release_reply
+ };
+ 
+ 
++
++struct set_faketime_request
++{
++    struct request_header __header;
++    unsigned __int64 faketime;
++};
++struct set_faketime_reply
++{
++    struct reply_header __header;
++};
++
+ enum request
+ {
+     REQ_new_process,
+@@ -6468,6 +6479,7 @@ enum request
+     REQ_d3dkmt_object_open_name,
+     REQ_d3dkmt_mutex_acquire,
+     REQ_d3dkmt_mutex_release,
++    REQ_set_faketime,
+     REQ_NB_REQUESTS
+ };
+ 
+@@ -6781,6 +6793,7 @@ union generic_request
+     struct d3dkmt_object_open_name_request d3dkmt_object_open_name_request;
+     struct d3dkmt_mutex_acquire_request d3dkmt_mutex_acquire_request;
+     struct d3dkmt_mutex_release_request d3dkmt_mutex_release_request;
++    struct set_faketime_request set_faketime_request;
+ };
+ union generic_reply
+ {
+@@ -7092,6 +7105,7 @@ union generic_reply
+     struct d3dkmt_object_open_name_reply d3dkmt_object_open_name_reply;
+     struct d3dkmt_mutex_acquire_reply d3dkmt_mutex_acquire_reply;
+     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
++    struct set_faketime_reply set_faketime_reply;
+ };
+ 
+ #define SERVER_PROTOCOL_VERSION 930
+diff --git a/loader/wine.inf.in b/loader/wine.inf.in
+index 56e3af73d53..d0f5af83d7a 100644
+--- a/loader/wine.inf.in
++++ b/loader/wine.inf.in
+@@ -1539,3 +1539,5 @@ HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
+ ;;Other app-specific overrides
+ HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",4,
+ HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",4,
++
++HKLM,System\CurrentControlSet\Control\IDConfigDB\Hardware Profiles\0001,"HwProfileGuid",,"{12345678-1234-1234-1234-123456789012}"
+diff --git a/server/fd.c b/server/fd.c
+index aa71e6dfe2a..4f6ee21a0bd 100644
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -351,6 +351,7 @@ static struct list abs_timeout_list = LIST_INIT(abs_timeout_list); /* sorted abs
+ static struct list rel_timeout_list = LIST_INIT(rel_timeout_list); /* sorted relative timeouts list */
+ timeout_t current_time;
+ timeout_t monotonic_time;
++static timeout_t faketime = 0;
+ 
+ struct _KUSER_SHARED_DATA *user_shared_data = NULL;
+ static const timeout_t user_shared_data_timeout = 16 * 10000;
+@@ -433,7 +434,7 @@ void set_current_time(void)
+     static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
+     struct timeval now;
+     gettimeofday( &now, NULL );
+-    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970;
++    current_time = (timeout_t)now.tv_sec * TICKS_PER_SEC + now.tv_usec * 10 + ticks_1601_to_1970 - faketime;
+     monotonic_time = monotonic_counter();
+     if (user_shared_data) set_user_shared_data_time();
+ }
+@@ -3333,3 +3334,8 @@ DECL_HANDLER(set_fd_eof_info)
+         release_object( fd );
+     }
+ }
++
++DECL_HANDLER(set_faketime)
++{
++    faketime = ((current_time >> 32) - req->faketime) << 32;
++}
+diff --git a/server/protocol.def b/server/protocol.def
+index ac38076b22c..dad95059e42 100644
+--- a/server/protocol.def
++++ b/server/protocol.def
+@@ -4353,3 +4353,9 @@ enum fsync_type
+     unsigned int shm_idx;
+ @REPLY
+ @END
++
++
++@REQ(set_faketime)
++    unsigned __int64 faketime;
++@REPLY
++@END
+diff --git a/server/request_handlers.h b/server/request_handlers.h
+index 42eb7daeab1..d5f702e541d 100644
+--- a/server/request_handlers.h
++++ b/server/request_handlers.h
+@@ -313,6 +313,7 @@ DECL_HANDLER(d3dkmt_share_objects);
+ DECL_HANDLER(d3dkmt_object_open_name);
+ DECL_HANDLER(d3dkmt_mutex_acquire);
+ DECL_HANDLER(d3dkmt_mutex_release);
++DECL_HANDLER(set_faketime);
+ 
+ typedef void (*req_handler)( const void *req, void *reply );
+ static const req_handler req_handlers[REQ_NB_REQUESTS] =
+@@ -623,6 +624,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
+     (req_handler)req_d3dkmt_object_open_name,
+     (req_handler)req_d3dkmt_mutex_acquire,
+     (req_handler)req_d3dkmt_mutex_release,
++    (req_handler)req_set_faketime,
+ };
+ 
+ C_ASSERT( sizeof(abstime_t) == 8 );
