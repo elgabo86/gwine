@@ -1,12 +1,11 @@
 diff --git a/server/fd.c b/server/fd.c
-index aa71e6d..031a788 100644
+index aa71e6d..833cc08 100644
 --- a/server/fd.c
 +++ b/server/fd.c
-@@ -1336,7 +1336,33 @@ static int set_unix_lock( struct fd *fd, file_pos_t start, file_pos_t end, int t
-                 break;  /* retry */
-             }
-             /* fall through */
--        default:
+@@ -2718,6 +2718,32 @@ void default_fd_get_file_info( struct fd *fd, obj_handle_t handle, unsigned int
+         }
+         else set_error( STATUS_OBJECT_TYPE_MISMATCH );
+         break;
 +    case FileStandardInformation:
 +        {
 +            FILE_STANDARD_INFORMATION info;
@@ -33,7 +32,6 @@ index aa71e6d..031a788 100644
 +            set_reply_data( &info, sizeof(info) );
 +            break;
 +        }
-+    default:
-             file_set_error();
-             return 0;
-         }
+     default:
+         set_error( STATUS_NOT_IMPLEMENTED );
+     }
