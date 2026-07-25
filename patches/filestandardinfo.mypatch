@@ -1,0 +1,39 @@
+diff --git a/server/fd.c b/server/fd.c
+index aa71e6d..031a788 100644
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -1336,7 +1336,33 @@ static int set_unix_lock( struct fd *fd, file_pos_t start, file_pos_t end, int t
+                 break;  /* retry */
+             }
+             /* fall through */
+-        default:
++    case FileStandardInformation:
++        {
++            FILE_STANDARD_INFORMATION info;
++            struct stat st;
++
++            if (get_reply_max_size() < sizeof(info))
++            {
++                set_error( STATUS_INFO_LENGTH_MISMATCH );
++                return;
++            }
++
++            if (fd->unix_fd != -1 && !fstat( fd->unix_fd, &st ))
++            {
++                info.AllocationSize.QuadPart = st.st_blksize ? (LONGLONG)st.st_blocks * 512 : st.st_size;
++                info.EndOfFile.QuadPart = st.st_size;
++                info.NumberOfLinks = st.st_nlink;
++                info.DeletePending = FALSE;
++                info.Directory = S_ISDIR(st.st_mode);
++            }
++            else
++            {
++                memset( &info, 0, sizeof(info) );
++            }
++            set_reply_data( &info, sizeof(info) );
++            break;
++        }
++    default:
+             file_set_error();
+             return 0;
+         }
