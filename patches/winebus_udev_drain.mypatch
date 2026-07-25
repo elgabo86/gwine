@@ -1,0 +1,46 @@
+diff --git a/dlls/winebus.sys/bus_udev.c b/dlls/winebus.sys/bus_udev.c
+index 0d54318..f7cdf3d 100644
+--- a/dlls/winebus.sys/bus_udev.c
++++ b/dlls/winebus.sys/bus_udev.c
+@@ -354,7 +354,7 @@ static void hidraw_device_read_report(struct unix_device *iface)
+     else if (size == 0)
+         TRACE("Failed to read report\n");
+     else
+-        bus_event_queue_input_report(&event_queue, iface, buff, size);
++        bus_event_queue_coalesced_input_report(&event_queue, iface, buff, size);
+ }
+ #endif
+ 
+@@ -1102,7 +1102,7 @@ static void lnxev_device_read_report(struct unix_device *iface)
+     else if (size == 0)
+         TRACE("Failed to read report\n");
+     else if (set_report_from_event(iface, &ie))
+-        bus_event_queue_input_report(&event_queue, iface, state->report_buf, state->report_len);
++        bus_event_queue_coalesced_input_report(&event_queue, iface, state->report_buf, state->report_len);
+ }
+ 
+ static NTSTATUS lnxev_device_haptics_start(struct unix_device *iface, UINT duration_ms,
+@@ -2212,7 +2212,22 @@ NTSTATUS udev_bus_wait(void *args)
+         {
+             if (!pfd[i].revents) continue;
+             impl = find_device_from_fd(pfd[i].fd);
+-            if (impl) impl->read_report(&impl->unix_device);
++            if (!impl) continue;
++            impl->read_report(&impl->unix_device);
++
++            /* High-report-rate devices (e.g. DualSense at 1000 Hz) produce
++             * several HID reports between winebus wait cycles. Drain the fd
++             * so that only the coalesced latest report is queued, avoiding
++             * stale report backlog and multi-second input latency. */
++            {
++                struct pollfd drain_pfd = { .fd = pfd[i].fd, .events = POLLIN };
++                int drained;
++                for (drained = 0; drained < 256; drained++)
++                {
++                    if (poll(&drain_pfd, 1, 0) <= 0) break;
++                    impl->read_report(&impl->unix_device);
++                }
++            }
+         }
+         pthread_mutex_unlock(&udev_cs);
+     }
