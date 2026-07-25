@@ -1,0 +1,19 @@
+diff --git a/dlls/hidclass.sys/device.c b/dlls/hidclass.sys/device.c
+index c3e0f85..702f902 100644
+--- a/dlls/hidclass.sys/device.c
++++ b/dlls/hidclass.sys/device.c
+@@ -676,6 +676,14 @@ NTSTATUS WINAPI pdo_ioctl( DEVICE_OBJECT *device, IRP *irp )
+             }
+             break;
+ 
++        /* Some games (e.g. DragonSword-Awakening) spam vendor-specific
++         * HID ioctls in a tight loop when a hidraw device is exposed.
++         * Return NOT_SUPPORTED without logging to avoid saturating the
++         * winebus thread with FIXME spam. */
++        case 0xb0197:
++            status = STATUS_NOT_SUPPORTED;
++            break;
++
+         default:
+         {
+             ULONG code = irpsp->Parameters.DeviceIoControl.IoControlCode;
