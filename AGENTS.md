@@ -45,6 +45,41 @@ Jeux Unity utilisant `wmvcore` (Windows Media Audio, ex: Bubsy the Woolies Strik
 
 **Workaround** : `winetricks wmp9` installe les DLLs natives Windows Media qui contournent winegstreamer pour le décodage WMA.
 
+### Loader 64-bit introuvable — RÉSOLU (via symlinks de packaging)
+
+**Symptôme** : depuis la build `gwine-11.0.433197.20260913`, plus aucun `.exe` ne démarre, et `gwine --init` échoue :
+```
+wine: failed to load .../lib/wine/i386-windows/ntdll.dll error 4000000e
+0024:err:environ:run_wineboot failed to start wineboot 1
+```
+
+**Cause racine** : le tag Valve `experimental-wine-bleeding-edge-11.0-433197-20260913` contient le hack upstream `loader: HACK: Build wine64 and wine64-preloader` (commit `e8f45bef0e4`, gating `PROTON_EOS_EAC` supprimé par le fixup `90855a2993e` le 30/08/2026 → activé **sans condition**). Dans `preloader_exec()` (`dlls/ntdll/unix/loader.c`) :
+```c
+if (machine == IMAGE_FILE_MACHINE_AMD64
+    && ((p = remove_tail( argv[1], "x86_64-unix/wine" )) || (p = remove_tail( argv[1], "i386-unix/wine64" ))))
+{
+    asprintf( &argv[0], "%si386-unix/wine64-preloader", p );
+    asprintf( &argv[1], "%si386-unix/wine64", p );
+}
+```
+Ce hack suppose la **disposition du build Proton** : `wine64` et `wine64-preloader` installés dans `lib/wine/i386-unix/` (voir `loader64/Makefile.in`, nouveau répertoire ajouté par Valve). Or gwine est compilé en **wow64 séparé** (`_NOLIB32="false"`) : ses loaders 64-bit sont dans `lib/wine/x86_64-unix/`, et `lib/wine/i386-unix/` ne contient que `wine` + `wine-preloader` (32-bit).
+
+**Conséquence** : Wine lance `i386-unix/wine-preloader` (32-bit) pour un process AMD64 → tentative de chargement de `i386-windows/ntdll.dll` → `STATUS_IMAGE_MACHINE_TYPE_MISMATCH` (`0x4000000e`) → échec. Confirmé par strace :
+```
+execve(.../lib/wine/i386-unix/wine64-preloader", ...) = -1 ENOENT
+execve(.../lib/wine/i386-unix/wine64",          ...) = -1 ENOENT
+execve(.../lib/wine/i386-unix/wine-preloader",  ...) = 0   <-- loader 32-bit pour un process 64-bit
+```
+
+**Fix** : dans `test-build.sh` ET `.github/workflows/build-gwine.yml`, après la détection de `UNIX32`/`UNIX64`, créer deux symlinks relatifs (chemins calculés via `realpath --relative-to`, portables quel que soit `lib/` vs `lib64/`) :
+```
+lib/wine/i386-unix/wine64            -> ../x86_64-unix/wine64
+lib/wine/i386-unix/wine64-preloader  -> ../x86_64-unix/wine64-preloader
+```
+Conditionné à l'existence de la cible (`-f`) et à l'absence du fichier (`! -e`) pour rester idempotent et compatible si Valve corrige un jour la disposition. Validation : `wineboot --init` passe et `cmd /c ver` fonctionne en 64-bit et en wow64 (`syswow64\cmd.exe`).
+
+**Portée** : gwine (CI + local). ⚠️ Ce hack étant non conditionnel côté Valve, tout nouveau tag bleeding-edge peut re-casser si la détection de layout change à nouveau — vérifier la présence de ces symlinks dans les archives produites.
+
 ## Build
 
 - gwine : déclenchement manuel (`workflow_dispatch`)

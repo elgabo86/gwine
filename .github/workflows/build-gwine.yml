@@ -265,6 +265,21 @@ jobs:
             if [ -d "$d" ]; then PE32="$d"; break; fi
           done
 
+          # Hack upstream Valve "loader: HACK: Build wine64 and wine64-preloader" (commit 90855a2993e,
+          # activé sans condition) : preloader_exec() réécrit le loader 64-bit vers i386-unix/wine64[-
+          # preloader] (disposition du build Proton). gwine est compilé en wow64 séparé : les loaders
+          # 64-bit sont dans x86_64-unix/, et i386-unix/ ne contient que wine/wine-preloader 32-bit.
+          # Sans ces symlinks, Wine lance un loader 32-bit pour un process AMD64 → tentative de chargement
+          # de i386-windows/ntdll.dll → STATUS_IMAGE_MACHINE_TYPE_MISMATCH (0x4000000e) et wineboot échoue.
+          if [ -n "${UNIX32}" ] && [ -n "${UNIX64}" ]; then
+            for f in wine64 wine64-preloader; do
+              if [ -f "${UNIX64}/${f}" ] && [ ! -e "${UNIX32}/${f}" ]; then
+                ln -sfn "$(realpath --relative-to="${UNIX32}" "${UNIX64}/${f}")" "${UNIX32}/${f}"
+                echo "Symlink loader 64-bit: ${UNIX32}/${f} -> $(readlink "${UNIX32}/${f}")"
+              fi
+            done
+          fi
+
           cp -a /opt/ffmpeg32/lib/libav*.so* /opt/ffmpeg32/lib/libsw*.so* "${UNIX32}/" 2>/dev/null || true
           cp -a /opt/ffmpeg64/lib/libav*.so* /opt/ffmpeg64/lib/libsw*.so* "${UNIX64}/" 2>/dev/null || true
 
