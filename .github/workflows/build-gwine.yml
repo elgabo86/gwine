@@ -295,6 +295,24 @@ jobs:
            cp -a /usr/lib/libgraphene-1.0.so* "gwine-$VERSION/lib32/gst-libs/" 2>/dev/null || true
            cp -a /usr/lib64/libgraphene-1.0.so* "gwine-$VERSION/lib64/gst-libs/" 2>/dev/null || true
            cp -a /usr/lib/libgraphene-1.0.so* "gwine-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           # Déps runtime elfutils/ocl-icd 32-bit : libgstreamer-1.0 (bundlé) link libdw.so.1
+           # (backtraces GST_DEBUG) et opencl.so (Wine 32-bit) link libOpenCL.so.1 — ces libs
+           # ne sont PAS installées explicitement côté image hôte (ocl-icd.i686 /
+           # elfutils-libs.i686 venaient d'une cascade de dépendances disparue le 20/09/2026
+           # → winegstreamer 32-bit mort : « Failed to create filter for GStreamer splitter
+           # filter, hr 0x8007000e »). Bundle dans gst-libs (sur le LD_LIBRARY_PATH du
+           # lanceur) pour un runner auto-portant. libzstd 32-bit embarqué aussi : son seul
+           # requérant système est elfutils-libelf.i686, lui-même sans requérant → présence
+           # fragile. libz/liblzma i686 restent système (requérants stables :
+           # fontconfig.i686 / mesa multilib explicites).
+           cp -a /usr/lib/libdw-*.so* /usr/lib/libdw.so.* "gwine-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libelf-*.so* /usr/lib/libelf.so.* "gwine-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libzstd.so.* "gwine-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libOpenCL.so.1* "gwine-$VERSION/lib32/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libdw-*.so* /usr/lib/libdw.so.* "gwine-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libelf-*.so* /usr/lib/libelf.so.* "gwine-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libzstd.so.* "gwine-$VERSION/lib/gst-libs/" 2>/dev/null || true
+           cp -a /usr/lib/libOpenCL.so.1* "gwine-$VERSION/lib/gst-libs/" 2>/dev/null || true
           mkdir -p "gwine-$VERSION/lib64/libexec/gstreamer-1.0" "gwine-$VERSION/lib32/libexec/gstreamer-1.0"
           cp -a /opt/gst64/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-$VERSION/lib64/libexec/gstreamer-1.0/" 2>/dev/null || true
           cp -a /opt/gst32/libexec/gstreamer-1.0/gst-plugin-scanner "gwine-$VERSION/lib32/libexec/gstreamer-1.0/" 2>/dev/null || true
